@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Yield Curve</title>
+
+<!-- ==================== STYLES ==================== -->
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Controls bar */
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+#controls .separator {
+  width: 1px;
+  height: 28px;
+  background: #ccc;
+  margin: 0 4px;
+}
+
+#controls select,
+#controls button {
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+#controls select:hover,
+#controls button:hover {
+  border-color: #888;
+  background: #f0f0f0;
+}
+
+#controls button.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+
+#controls button.active:hover {
+  background: #555;
+}
+
+#csv-btn {
+  background: #e8f4e8 !important;
+  border-color: #6a6 !important;
+  color: #363 !important;
+}
+#csv-btn:hover {
+  background: #d0ecd0 !important;
+}
+
+.help-tip {
+  font-size: 0.75rem;
+  color: #888;
+  cursor: help;
+  position: relative;
+}
+.help-tip:hover .help-tooltip {
+  display: block;
+}
+.help-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  width: 320px;
+  z-index: 100;
+  margin-bottom: 6px;
+  pointer-events: none;
+}
+
+/* Chart container */
+#chart-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 400px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+#chart-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#chart-container.dragover {
+  outline: 3px dashed #6a6;
+  outline-offset: -3px;
+}
+
+/* Axis labels */
+.axis-label {
+  position: absolute;
+  font-size: 0.7rem;
+  color: #666;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+.axis-label.title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+}
+
+/* Legend */
+#legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: #666;
+}
+#legend canvas {
+  border-radius: 3px;
+  border: 1px solid #ddd;
+}
+#legend .legend-label {
+  min-width: 30px;
+}
+
+/* Data info */
+#data-info {
+  font-size: 0.75rem;
+  color: #999;
+  margin-top: 8px;
+}
+
+/* Drop overlay */
+#drop-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(106,170,106,0.15);
+  z-index: 50;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: #363;
+  font-weight: 600;
+}
+
+#chart-container.dragover #drop-overlay {
+  display: flex;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  #app { padding: 12px; }
+  h1 { font-size: 1.2rem; }
+  #controls { gap: 4px; }
+  #controls select, #controls button { font-size: 0.75rem; padding: 5px 10px; }
+  #chart-container { aspect-ratio: 4 / 3; min-height: 300px; }
+}
+</style>
+
+<!-- D3.js v7 -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+
+<!-- Three.js import map -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ==================== HTML STRUCTURE ==================== -->
+<div id="app">
+  <h1>3D Yield Curve</h1>
+
+  <div id="controls">
+    <!-- Data controls -->
+    <select id="sample-select">
+      <option value="us">US Treasury (2019-2024)</option>
+      <option value="jp">Japan JGB (2019-2024)</option>
+      <option value="random">Random Demo</option>
+    </select>
+    <button id="csv-btn">Load CSV</button>
+    <input type="file" id="csv-input" accept=".csv" style="display:none">
+    <span class="help-tip">CSV format ?<span class="help-tooltip">CSV format:
+date,1M,3M,6M,1Y,2Y,5Y,10Y,30Y
+2024-01-02,5.53,5.47,5.36,5.01,4.40,3.98,3.95,4.10
+...
+First column: date (YYYY-MM-DD)
+Other columns: maturity labels with yield values
+Maturity names: use M for months, Y for years</span></span>
+
+    <div class="separator"></div>
+
+    <!-- Color scheme -->
+    <select id="color-select">
+      <optgroup label="Sequential (Single-hue)">
+        <option value="Blues">Blues</option>
+        <option value="Greens">Greens</option>
+        <option value="Greys">Greys</option>
+        <option value="Oranges">Oranges</option>
+        <option value="Purples">Purples</option>
+        <option value="Reds">Reds</option>
+      </optgroup>
+      <optgroup label="Sequential (Multi-hue)">
+        <option value="BuGn">BuGn</option>
+        <option value="BuPu">BuPu</option>
+        <option value="GnBu">GnBu</option>
+        <option value="OrRd">OrRd</option>
+        <option value="PuBu">PuBu</option>
+        <option value="PuBuGn">PuBuGn</option>
+        <option value="PuRd">PuRd</option>
+        <option value="RdPu">RdPu</option>
+        <option value="YlGn">YlGn</option>
+        <option value="YlGnBu">YlGnBu</option>
+        <option value="YlOrBr">YlOrBr</option>
+        <option value="YlOrRd" selected>YlOrRd</option>
+        <option value="Cividis">Cividis</option>
+        <option value="Viridis">Viridis</option>
+        <option value="Inferno">Inferno</option>
+        <option value="Magma">Magma</option>
+        <option value="Plasma">Plasma</option>
+        <option value="Warm">Warm</option>
+        <option value="Cool">Cool</option>
+        <option value="Turbo">Turbo</option>
+        <option value="CubehelixDefault">Cubehelix</option>
+      </optgroup>
+      <optgroup label="Diverging">
+        <option value="BrBG">BrBG</option>
+        <option value="PRGn">PRGn</option>
+        <option value="PiYG">PiYG</option>
+        <option value="PuOr">PuOr</option>
+        <option value="RdBu">RdBu</option>
+        <option value="RdGy">RdGy</option>
+        <option value="RdYlBu">RdYlBu</option>
+        <option value="RdYlGn">RdYlGn</option>
+        <option value="Spectral">Spectral</option>
+      </optgroup>
+    </select>
+
+    <div class="separator"></div>
+
+    <!-- Camera presets -->
+    <button class="view-btn active" data-view="overview">Overview</button>
+    <button class="view-btn" data-view="front">Front</button>
+    <button class="view-btn" data-view="top">Top</button>
+    <button class="view-btn" data-view="side">Side</button>
+  </div>
+
+  <div id="chart-container">
+    <div id="drop-overlay">Drop CSV file here</div>
+  </div>
+
+  <div id="legend">
+    <span class="legend-label" id="legend-min"></span>
+    <canvas id="legend-canvas" width="250" height="16"></canvas>
+    <span class="legend-label" id="legend-max"></span>
+    <span style="margin-left:8px">Yield (%)</span>
+  </div>
+
+  <div id="data-info"></div>
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ===== SECTION 1: CONFIGURATION =====
+const CONFIG = {
+  surfaceWidth: 30,
+  surfaceHeight: 12,
+  surfaceDepth: 30,
+  gridOpacity: 0.25,
+  gridColor: 0x555555,
+  bgColor: 0xffffff,
+  cameraFov: 45,
+  transitionFrames: 90,
+};
+
+// ===== SECTION 2: CAMERA PRESETS =====
+const CAMERA_PRESETS = {
+  overview: {
+    position: [40, 28, 40],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
+  front: {
+    position: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.5, CONFIG.surfaceDepth + 30],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
+  top: {
+    position: [CONFIG.surfaceWidth / 2, 55, CONFIG.surfaceDepth / 2 + 0.1],
+    target: [CONFIG.surfaceWidth / 2, 0, CONFIG.surfaceDepth / 2],
+  },
+  side: {
+    position: [-25, CONFIG.surfaceHeight * 0.6, CONFIG.surfaceDepth / 2],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
+};
+
+// ===== SECTION 3: SAMPLE DATA =====
+
+// --- US Treasury Yield Curve (monthly, 2019-2024) ---
+const US_TREASURY_DATA = {
+  maturities: ['1M','3M','6M','1Y','2Y','3Y','5Y','7Y','10Y','20Y','30Y'],
+  maturityMonths: [1, 3, 6, 12, 24, 36, 60, 84, 120, 240, 360],
+  curves: [
+    {date:'2019-01-02',yields:[2.40,2.42,2.56,2.60,2.50,2.47,2.49,2.56,2.66,2.87,2.97]},
+    {date:'2019-02-01',yields:[2.40,2.42,2.50,2.55,2.50,2.48,2.51,2.57,2.69,2.90,3.02]},
+    {date:'2019-03-01',yields:[2.43,2.44,2.48,2.49,2.35,2.30,2.28,2.35,2.43,2.69,2.81]},
+    {date:'2019-04-01',yields:[2.43,2.40,2.44,2.40,2.31,2.26,2.30,2.38,2.50,2.74,2.91]},
+    {date:'2019-05-01',yields:[2.42,2.39,2.40,2.36,2.22,2.14,2.12,2.20,2.32,2.58,2.73]},
+    {date:'2019-06-03',yields:[2.35,2.20,2.12,2.00,1.77,1.72,1.77,1.88,2.02,2.32,2.52]},
+    {date:'2019-07-01',yields:[2.19,2.12,2.05,1.92,1.75,1.73,1.77,1.88,2.02,2.31,2.52]},
+    {date:'2019-08-01',yields:[2.08,2.00,1.93,1.81,1.58,1.50,1.48,1.56,1.67,2.01,2.19]},
+    {date:'2019-09-03',yields:[2.00,1.88,1.84,1.76,1.53,1.47,1.42,1.50,1.56,1.86,2.03]},
+    {date:'2019-10-01',yields:[1.86,1.72,1.72,1.62,1.50,1.48,1.51,1.59,1.68,1.97,2.13]},
+    {date:'2019-11-01',yields:[1.58,1.55,1.59,1.57,1.58,1.59,1.63,1.73,1.78,2.08,2.23]},
+    {date:'2019-12-02',yields:[1.54,1.55,1.60,1.59,1.61,1.63,1.69,1.78,1.84,2.13,2.28]},
+    {date:'2020-01-02',yields:[1.53,1.55,1.59,1.57,1.58,1.59,1.67,1.79,1.88,2.20,2.33]},
+    {date:'2020-02-03',yields:[1.55,1.53,1.51,1.46,1.40,1.39,1.41,1.50,1.58,1.91,2.05]},
+    {date:'2020-03-02',yields:[1.29,1.08,0.94,0.86,0.81,0.77,0.76,0.87,1.03,1.42,1.64]},
+    {date:'2020-04-01',yields:[0.09,0.14,0.24,0.17,0.23,0.29,0.37,0.52,0.62,1.05,1.24]},
+    {date:'2020-05-01',yields:[0.07,0.11,0.16,0.15,0.20,0.24,0.36,0.50,0.64,1.08,1.28]},
+    {date:'2020-06-01',yields:[0.12,0.16,0.18,0.17,0.19,0.22,0.33,0.49,0.66,1.15,1.41]},
+    {date:'2020-07-01',yields:[0.09,0.13,0.16,0.14,0.15,0.17,0.29,0.44,0.63,1.12,1.37]},
+    {date:'2020-08-03',yields:[0.09,0.10,0.12,0.12,0.13,0.15,0.23,0.39,0.55,1.00,1.22]},
+    {date:'2020-09-01',yields:[0.08,0.10,0.11,0.12,0.14,0.17,0.27,0.44,0.68,1.19,1.44]},
+    {date:'2020-10-01',yields:[0.08,0.09,0.10,0.12,0.15,0.19,0.31,0.48,0.69,1.21,1.46]},
+    {date:'2020-11-02',yields:[0.08,0.09,0.10,0.11,0.16,0.21,0.39,0.58,0.83,1.35,1.59]},
+    {date:'2020-12-01',yields:[0.07,0.08,0.09,0.10,0.13,0.18,0.37,0.56,0.84,1.39,1.62]},
+    {date:'2021-01-04',yields:[0.07,0.08,0.09,0.10,0.13,0.19,0.40,0.65,1.02,1.58,1.80]},
+    {date:'2021-02-01',yields:[0.04,0.05,0.06,0.07,0.11,0.20,0.46,0.74,1.09,1.67,1.87]},
+    {date:'2021-03-01',yields:[0.03,0.04,0.05,0.07,0.14,0.30,0.72,1.07,1.45,2.00,2.17]},
+    {date:'2021-04-01',yields:[0.02,0.03,0.04,0.06,0.16,0.33,0.82,1.14,1.63,2.14,2.30]},
+    {date:'2021-05-03',yields:[0.01,0.02,0.04,0.05,0.16,0.31,0.80,1.17,1.60,2.17,2.30]},
+    {date:'2021-06-01',yields:[0.02,0.03,0.05,0.06,0.15,0.32,0.77,1.13,1.47,2.05,2.15]},
+    {date:'2021-07-01',yields:[0.05,0.05,0.06,0.07,0.25,0.41,0.77,1.06,1.35,1.88,1.97]},
+    {date:'2021-08-02',yields:[0.05,0.05,0.05,0.07,0.21,0.38,0.71,1.00,1.24,1.76,1.89]},
+    {date:'2021-09-01',yields:[0.04,0.04,0.05,0.07,0.22,0.40,0.79,1.11,1.37,1.87,1.93]},
+    {date:'2021-10-01',yields:[0.03,0.04,0.05,0.09,0.28,0.49,0.97,1.27,1.49,1.98,2.04]},
+    {date:'2021-11-01',yields:[0.05,0.05,0.07,0.15,0.50,0.73,1.14,1.39,1.55,1.96,1.95]},
+    {date:'2021-12-01',yields:[0.04,0.06,0.19,0.39,0.73,0.95,1.26,1.44,1.51,1.87,1.88]},
+    {date:'2022-01-03',yields:[0.05,0.08,0.22,0.40,0.78,1.04,1.37,1.55,1.63,2.01,2.01]},
+    {date:'2022-02-01',yields:[0.05,0.21,0.47,0.78,1.18,1.42,1.68,1.79,1.80,2.14,2.11]},
+    {date:'2022-03-01',yields:[0.15,0.33,0.69,1.04,1.44,1.63,1.84,1.93,1.94,2.31,2.28]},
+    {date:'2022-04-01',yields:[0.20,0.52,1.02,1.53,2.28,2.52,2.69,2.71,2.38,2.61,2.44]},
+    {date:'2022-05-02',yields:[0.54,0.84,1.37,1.88,2.56,2.73,2.85,2.87,2.89,3.18,3.07]},
+    {date:'2022-06-01',yields:[0.77,1.15,1.68,2.21,2.68,2.82,2.94,2.99,2.98,3.32,3.15]},
+    {date:'2022-07-01',yields:[1.26,1.73,2.43,2.86,2.97,2.95,2.90,2.91,2.89,3.24,3.07]},
+    {date:'2022-08-01',yields:[2.19,2.61,3.01,3.10,3.05,2.98,2.87,2.87,2.83,3.22,3.07]},
+    {date:'2022-09-01',yields:[2.39,2.98,3.41,3.52,3.45,3.43,3.37,3.38,3.33,3.65,3.45]},
+    {date:'2022-10-03',yields:[2.80,3.33,3.93,4.08,4.10,4.12,4.04,3.97,3.83,4.09,3.88]},
+    {date:'2022-11-01',yields:[3.65,4.02,4.42,4.53,4.48,4.38,4.17,4.07,3.93,4.17,4.02]},
+    {date:'2022-12-01',yields:[3.90,4.24,4.63,4.65,4.41,4.23,3.96,3.88,3.82,4.09,3.97]},
+    {date:'2023-01-03',yields:[4.09,4.42,4.70,4.68,4.41,4.20,3.94,3.85,3.79,4.07,3.96]},
+    {date:'2023-02-01',yields:[4.51,4.67,4.81,4.83,4.51,4.27,3.98,3.87,3.74,3.99,3.84]},
+    {date:'2023-03-01',yields:[4.60,4.79,4.96,4.95,4.64,4.38,4.06,3.95,3.83,4.08,3.88]},
+    {date:'2023-04-03',yields:[4.67,4.88,5.00,4.90,4.37,4.09,3.72,3.63,3.52,3.86,3.70]},
+    {date:'2023-05-01',yields:[5.17,5.12,5.14,5.00,4.32,4.03,3.62,3.56,3.44,3.80,3.69]},
+    {date:'2023-06-01',yields:[5.24,5.24,5.30,5.20,4.60,4.33,3.98,3.90,3.75,4.06,3.88]},
+    {date:'2023-07-03',yields:[5.28,5.33,5.37,5.26,4.74,4.49,4.13,4.09,3.97,4.26,4.06]},
+    {date:'2023-08-01',yields:[5.33,5.37,5.40,5.30,4.77,4.51,4.19,4.16,4.06,4.37,4.18]},
+    {date:'2023-09-01',yields:[5.34,5.38,5.41,5.32,4.87,4.62,4.32,4.30,4.26,4.60,4.38]},
+    {date:'2023-10-02',yields:[5.33,5.36,5.39,5.35,5.02,4.80,4.52,4.50,4.57,4.96,4.73]},
+    {date:'2023-11-01',yields:[5.33,5.36,5.39,5.34,4.94,4.70,4.42,4.43,4.57,4.95,4.77]},
+    {date:'2023-12-01',yields:[5.33,5.35,5.35,5.17,4.65,4.39,4.13,4.14,4.20,4.54,4.37]},
+    {date:'2024-01-02',yields:[5.33,5.35,5.36,5.01,4.40,4.17,3.98,4.01,3.95,4.24,4.10]},
+    {date:'2024-02-01',yields:[5.33,5.34,5.31,4.97,4.41,4.22,4.06,4.10,4.07,4.36,4.22]},
+    {date:'2024-03-01',yields:[5.33,5.33,5.29,5.00,4.53,4.33,4.14,4.15,4.10,4.36,4.21]},
+    {date:'2024-04-01',yields:[5.34,5.34,5.32,5.08,4.63,4.43,4.27,4.30,4.25,4.50,4.38]},
+    {date:'2024-05-01',yields:[5.33,5.34,5.31,5.04,4.63,4.46,4.32,4.35,4.33,4.60,4.47]},
+    {date:'2024-06-03',yields:[5.32,5.34,5.31,5.07,4.70,4.55,4.39,4.40,4.36,4.59,4.49]},
+    {date:'2024-07-01',yields:[5.32,5.33,5.28,5.02,4.59,4.43,4.26,4.28,4.25,4.52,4.43]},
+    {date:'2024-08-01',yields:[5.30,5.23,5.04,4.65,4.16,3.96,3.79,3.83,3.87,4.19,4.14]},
+    {date:'2024-09-03',yields:[5.02,4.87,4.51,4.11,3.60,3.47,3.39,3.49,3.62,4.03,3.99]},
+    {date:'2024-10-01',yields:[4.65,4.49,4.28,3.97,3.64,3.56,3.52,3.60,3.73,4.10,4.06]},
+    {date:'2024-11-01',yields:[4.56,4.46,4.33,4.12,3.86,3.79,3.78,3.87,4.00,4.34,4.27]},
+    {date:'2024-12-02',yields:[4.44,4.34,4.27,4.11,3.91,3.87,3.88,3.96,4.08,4.41,4.31]},
+  ]
+};
+
+// --- Japan JGB Yield Curve (monthly, 2019-2024) ---
+const JAPAN_JGB_DATA = {
+  maturities: ['1Y','2Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','40Y'],
+  maturityMonths: [12, 24, 36, 60, 84, 120, 180, 240, 360, 480],
+  curves: [
+    {date:'2019-01-04',yields:[-0.16,-0.17,-0.17,-0.14,-0.09,0.00,0.22,0.42,0.64,0.73]},
+    {date:'2019-02-01',yields:[-0.17,-0.19,-0.20,-0.18,-0.14,-0.04,0.18,0.38,0.60,0.69]},
+    {date:'2019-03-01',yields:[-0.16,-0.19,-0.21,-0.20,-0.16,-0.05,0.16,0.35,0.55,0.63]},
+    {date:'2019-04-01',yields:[-0.13,-0.15,-0.17,-0.17,-0.14,-0.05,0.13,0.33,0.52,0.60]},
+    {date:'2019-05-07',yields:[-0.15,-0.18,-0.21,-0.21,-0.18,-0.08,0.10,0.29,0.48,0.55]},
+    {date:'2019-06-03',yields:[-0.19,-0.23,-0.26,-0.25,-0.21,-0.12,0.04,0.22,0.38,0.44]},
+    {date:'2019-07-01',yields:[-0.20,-0.24,-0.27,-0.27,-0.24,-0.15,-0.01,0.18,0.34,0.40]},
+    {date:'2019-08-01',yields:[-0.22,-0.30,-0.34,-0.35,-0.31,-0.21,-0.05,0.12,0.26,0.30]},
+    {date:'2019-09-02',yields:[-0.27,-0.35,-0.37,-0.37,-0.32,-0.23,-0.07,0.09,0.22,0.26]},
+    {date:'2019-10-01',yields:[-0.22,-0.27,-0.28,-0.26,-0.22,-0.15,0.02,0.18,0.34,0.39]},
+    {date:'2019-11-01',yields:[-0.16,-0.20,-0.20,-0.16,-0.11,-0.05,0.10,0.27,0.44,0.51]},
+    {date:'2019-12-02',yields:[-0.12,-0.13,-0.11,-0.07,-0.02,0.02,0.12,0.28,0.44,0.52]},
+    {date:'2020-01-06',yields:[-0.12,-0.13,-0.12,-0.08,-0.04,0.02,0.13,0.29,0.44,0.51]},
+    {date:'2020-02-03',yields:[-0.14,-0.16,-0.16,-0.15,-0.11,-0.03,0.10,0.25,0.40,0.46]},
+    {date:'2020-03-02',yields:[-0.16,-0.20,-0.22,-0.22,-0.18,-0.10,0.03,0.16,0.30,0.35]},
+    {date:'2020-04-01',yields:[-0.10,-0.12,-0.12,-0.09,-0.05,0.01,0.14,0.30,0.44,0.49]},
+    {date:'2020-05-01',yields:[-0.11,-0.13,-0.12,-0.09,-0.05,0.00,0.13,0.29,0.42,0.46]},
+    {date:'2020-06-01',yields:[-0.12,-0.13,-0.12,-0.08,-0.03,0.02,0.14,0.31,0.45,0.49]},
+    {date:'2020-07-01',yields:[-0.13,-0.14,-0.13,-0.09,-0.04,0.02,0.15,0.32,0.46,0.50]},
+    {date:'2020-08-03',yields:[-0.14,-0.14,-0.13,-0.09,-0.04,0.02,0.16,0.34,0.48,0.53]},
+    {date:'2020-09-01',yields:[-0.12,-0.13,-0.11,-0.07,-0.02,0.04,0.18,0.36,0.51,0.56]},
+    {date:'2020-10-01',yields:[-0.13,-0.14,-0.12,-0.09,-0.04,0.02,0.17,0.36,0.51,0.56]},
+    {date:'2020-11-02',yields:[-0.12,-0.13,-0.11,-0.07,-0.02,0.03,0.18,0.37,0.52,0.58]},
+    {date:'2020-12-01',yields:[-0.12,-0.12,-0.10,-0.05,0.00,0.03,0.16,0.36,0.52,0.58]},
+    {date:'2021-01-04',yields:[-0.12,-0.12,-0.10,-0.05,0.00,0.04,0.18,0.38,0.54,0.61]},
+    {date:'2021-02-01',yields:[-0.12,-0.11,-0.09,-0.03,0.03,0.07,0.22,0.43,0.60,0.67]},
+    {date:'2021-03-01',yields:[-0.12,-0.10,-0.07,-0.01,0.06,0.12,0.30,0.50,0.67,0.73]},
+    {date:'2021-04-01',yields:[-0.11,-0.10,-0.08,-0.04,0.01,0.09,0.28,0.48,0.65,0.72]},
+    {date:'2021-05-06',yields:[-0.11,-0.11,-0.09,-0.05,0.00,0.08,0.26,0.46,0.64,0.71]},
+    {date:'2021-06-01',yields:[-0.12,-0.11,-0.09,-0.05,-0.01,0.05,0.22,0.43,0.62,0.70]},
+    {date:'2021-07-01',yields:[-0.12,-0.11,-0.10,-0.07,-0.04,0.03,0.19,0.39,0.58,0.66]},
+    {date:'2021-08-02',yields:[-0.12,-0.12,-0.11,-0.08,-0.04,0.02,0.16,0.36,0.55,0.63]},
+    {date:'2021-09-01',yields:[-0.12,-0.11,-0.09,-0.06,-0.01,0.05,0.19,0.39,0.58,0.66]},
+    {date:'2021-10-01',yields:[-0.11,-0.10,-0.07,-0.03,0.02,0.08,0.22,0.44,0.63,0.72]},
+    {date:'2021-11-01',yields:[-0.10,-0.09,-0.07,-0.04,0.00,0.06,0.20,0.42,0.62,0.70]},
+    {date:'2021-12-01',yields:[-0.09,-0.08,-0.06,-0.03,0.01,0.07,0.20,0.42,0.61,0.69]},
+    {date:'2022-01-04',yields:[-0.07,-0.05,-0.03,0.00,0.05,0.11,0.26,0.48,0.68,0.77]},
+    {date:'2022-02-01',yields:[-0.04,-0.02,0.00,0.03,0.08,0.17,0.36,0.56,0.74,0.82]},
+    {date:'2022-03-01',yields:[-0.04,-0.01,0.01,0.03,0.09,0.18,0.39,0.62,0.82,0.91]},
+    {date:'2022-04-01',yields:[-0.05,-0.03,0.00,0.03,0.10,0.22,0.47,0.70,0.90,1.00]},
+    {date:'2022-05-02',yields:[-0.05,-0.03,-0.01,0.02,0.08,0.23,0.52,0.74,0.94,1.03]},
+    {date:'2022-06-01',yields:[-0.05,-0.04,-0.01,0.02,0.10,0.24,0.55,0.80,1.02,1.11]},
+    {date:'2022-07-01',yields:[-0.08,-0.07,-0.04,0.00,0.05,0.23,0.57,0.83,1.08,1.18]},
+    {date:'2022-08-01',yields:[-0.09,-0.08,-0.05,-0.02,0.02,0.18,0.50,0.74,0.97,1.07]},
+    {date:'2022-09-01',yields:[-0.08,-0.06,-0.03,0.00,0.05,0.24,0.56,0.82,1.06,1.17]},
+    {date:'2022-10-03',yields:[-0.06,-0.03,0.00,0.05,0.12,0.25,0.57,0.84,1.10,1.24]},
+    {date:'2022-11-01',yields:[-0.05,-0.02,0.02,0.06,0.14,0.25,0.56,0.84,1.14,1.30]},
+    {date:'2022-12-01',yields:[-0.02,0.01,0.04,0.10,0.19,0.40,0.77,1.07,1.37,1.48]},
+    {date:'2023-01-04',yields:[-0.02,0.00,0.03,0.08,0.18,0.41,0.80,1.13,1.42,1.53]},
+    {date:'2023-02-01',yields:[-0.03,-0.01,0.02,0.09,0.22,0.48,0.88,1.20,1.46,1.56]},
+    {date:'2023-03-01',yields:[-0.06,-0.03,0.00,0.05,0.16,0.37,0.73,1.05,1.33,1.43]},
+    {date:'2023-04-03',yields:[-0.06,-0.04,0.00,0.05,0.13,0.34,0.67,0.98,1.28,1.39]},
+    {date:'2023-05-01',yields:[-0.06,-0.04,0.00,0.05,0.13,0.38,0.72,1.02,1.29,1.38]},
+    {date:'2023-06-01',yields:[-0.05,-0.02,0.02,0.07,0.17,0.40,0.75,1.08,1.35,1.46]},
+    {date:'2023-07-03',yields:[-0.05,-0.02,0.01,0.06,0.17,0.42,0.77,1.10,1.38,1.49]},
+    {date:'2023-08-01',yields:[-0.02,0.00,0.04,0.12,0.25,0.56,0.92,1.24,1.50,1.60]},
+    {date:'2023-09-01',yields:[-0.01,0.02,0.06,0.16,0.32,0.65,1.00,1.30,1.56,1.66]},
+    {date:'2023-10-02',yields:[0.00,0.03,0.08,0.19,0.36,0.73,1.08,1.39,1.63,1.74]},
+    {date:'2023-11-01',yields:[0.00,0.05,0.10,0.22,0.40,0.80,1.15,1.44,1.67,1.77]},
+    {date:'2023-12-01',yields:[0.00,0.04,0.08,0.18,0.35,0.65,0.99,1.30,1.55,1.65]},
+    {date:'2024-01-04',yields:[0.01,0.05,0.10,0.22,0.38,0.62,0.94,1.26,1.52,1.63]},
+    {date:'2024-02-01',yields:[0.02,0.07,0.12,0.25,0.42,0.72,1.04,1.36,1.60,1.70]},
+    {date:'2024-03-01',yields:[0.02,0.10,0.17,0.30,0.48,0.73,1.06,1.38,1.63,1.73]},
+    {date:'2024-04-01',yields:[0.05,0.14,0.22,0.36,0.54,0.77,1.10,1.44,1.70,1.82]},
+    {date:'2024-05-01',yields:[0.08,0.18,0.28,0.44,0.63,0.88,1.22,1.56,1.82,1.95]},
+    {date:'2024-06-03',yields:[0.09,0.22,0.33,0.50,0.70,0.98,1.34,1.68,1.92,2.06]},
+    {date:'2024-07-01',yields:[0.15,0.32,0.44,0.58,0.76,1.05,1.40,1.72,1.96,2.10]},
+    {date:'2024-08-01',yields:[0.17,0.32,0.40,0.50,0.64,0.87,1.20,1.55,1.82,1.98]},
+    {date:'2024-09-02',yields:[0.16,0.30,0.38,0.47,0.61,0.84,1.18,1.53,1.80,1.95]},
+    {date:'2024-10-01',yields:[0.17,0.31,0.40,0.51,0.66,0.90,1.24,1.58,1.86,2.00]},
+    {date:'2024-11-01',yields:[0.22,0.38,0.48,0.60,0.76,1.00,1.35,1.68,1.94,2.08]},
+    {date:'2024-12-02',yields:[0.25,0.42,0.54,0.68,0.84,1.06,1.38,1.70,1.96,2.12]},
+  ]
+};
+
+// --- Random Demo Generator ---
+function generateRandomData() {
+  const maturities = ['3M','6M','1Y','2Y','5Y','10Y','20Y','30Y'];
+  const maturityMonths = [3, 6, 12, 24, 60, 120, 240, 360];
+  const curves = [];
+  const numDates = 60;
+  let baseRate = 2.0 + Math.random() * 2;
+
+  for (let i = 0; i < numDates; i++) {
+    const d = new Date(2020, i, 1);
+    const dateStr = d.toISOString().slice(0, 10);
+    baseRate += (Math.random() - 0.5) * 0.3;
+    baseRate = Math.max(-0.5, Math.min(7, baseRate));
+    const yields = maturityMonths.map((m, j) => {
+      const spread = Math.log(m / 3 + 1) * (0.8 + Math.random() * 0.4);
+      const noise = (Math.random() - 0.5) * 0.2;
+      return Math.round((baseRate + spread + noise) * 100) / 100;
+    });
+    curves.push({ date: dateStr, yields });
+  }
+  return { maturities, maturityMonths, curves };
+}
+
+const SAMPLE_DATASETS = {
+  us: US_TREASURY_DATA,
+  jp: JAPAN_JGB_DATA,
+  random: null, // generated on demand
+};
+
+// ===== SECTION 4: STATE =====
+let renderer, camera, controls, scene;
+let surfaceGroup = null;
+let labelElements = [];
+let currentData = null;
+let yieldMin = 0, yieldMax = 6;
+let xScale, yScale, zScale, colorScale;
+let currentColorScheme = 'YlOrRd';
+
+// Camera animation
+let animating = false;
+let animStartPos, animEndPos, animStartTarget, animEndTarget;
+let animFrame = 0;
+
+// ===== SECTION 4b: COLOR SCHEME HELPERS =====
+function getInterpolator(name) {
+  return d3['interpolate' + name] || d3.interpolateYlOrRd;
+}
+
+function updateColors() {
+  if (!currentData || !surfaceGroup) return;
+  colorScale = d3.scaleSequential(getInterpolator(currentColorScheme))
+    .domain([yieldMin, yieldMax]);
+
+  // Update surface mesh vertex colors
+  surfaceGroup.traverse(obj => {
+    if (obj.isMesh && obj.geometry.getAttribute('color')) {
+      const { maturityMonths, curves } = currentData;
+      const numX = maturityMonths.length;
+      const numZ = curves.length;
+      const colors = obj.geometry.getAttribute('color');
+      for (let iz = 0; iz < numZ; iz++) {
+        for (let ix = 0; ix < numX; ix++) {
+          const idx = iz * numX + ix;
+          const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+          const c = new THREE.Color(colorScale(val));
+          colors.setXYZ(idx, c.r, c.g, c.b);
+        }
+      }
+      colors.needsUpdate = true;
+    }
+  });
+
+  buildLegend();
+}
+
+// ===== SECTION 5: INITIALIZATION =====
+function init() {
+  const container = document.getElementById('chart-container');
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(CONFIG.bgColor);
+  container.appendChild(renderer.domElement);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(CONFIG.cameraFov, 2, 0.1, 1000);
+  const preset = CAMERA_PRESETS.overview;
+  camera.position.set(...preset.position);
+
+  // Scene
+  scene = new THREE.Scene();
+
+  // Controls
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(...preset.target);
+  controls.update();
+
+  // Resize
+  onResize();
+  new ResizeObserver(onResize).observe(container);
+  window.addEventListener('resize', onResize);
+
+  // Event listeners
+  setupEventListeners();
+
+  // Load default data
+  loadData(US_TREASURY_DATA);
+
+  // Animation loop
+  animate();
+}
+
+// ===== SECTION 6: DATA LOADING =====
+function loadData(data) {
+  currentData = data;
+  const { maturities, maturityMonths, curves } = data;
+
+  // Compute yield range
+  let allYields = curves.flatMap(c => c.yields).filter(v => !isNaN(v));
+  yieldMin = Math.floor(Math.min(...allYields));
+  yieldMax = Math.ceil(Math.max(...allYields));
+  if (yieldMin === yieldMax) { yieldMin -= 1; yieldMax += 1; }
+
+  // D3 scales
+  xScale = d3.scaleLinear()
+    .domain([d3.min(maturityMonths), d3.max(maturityMonths)])
+    .range([0, CONFIG.surfaceWidth]);
+
+  yScale = d3.scaleLinear()
+    .domain([yieldMin, yieldMax])
+    .range([0, CONFIG.surfaceHeight]);
+
+  zScale = d3.scaleLinear()
+    .domain([0, curves.length - 1])
+    .range([0, CONFIG.surfaceDepth]);
+
+  colorScale = d3.scaleSequential(getInterpolator(currentColorScheme))
+    .domain([yieldMin, yieldMax]);
+
+  // Clear previous
+  if (surfaceGroup) {
+    scene.remove(surfaceGroup);
+    surfaceGroup.traverse(obj => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+    });
+  }
+  clearLabels();
+
+  // Build scene
+  surfaceGroup = new THREE.Group();
+  surfaceGroup.add(buildSurface(data));
+  surfaceGroup.add(buildGridLines(data));
+  surfaceGroup.add(buildBoundingBox());
+  scene.add(surfaceGroup);
+
+  // Labels & legend
+  createLabels(data);
+  buildLegend();
+  updateDataInfo(data);
+}
+
+// ===== SECTION 7: SURFACE MESH =====
+function buildSurface(data) {
+  const { maturityMonths, curves } = data;
+  const numX = maturityMonths.length;
+  const numZ = curves.length;
+  const totalVerts = numX * numZ;
+
+  const positions = new Float32Array(totalVerts * 3);
+  const colors = new Float32Array(totalVerts * 3);
+
+  for (let iz = 0; iz < numZ; iz++) {
+    for (let ix = 0; ix < numX; ix++) {
+      const idx = (iz * numX + ix) * 3;
+      const yieldVal = curves[iz].yields[ix];
+      const val = isNaN(yieldVal) ? 0 : yieldVal;
+
+      positions[idx]     = xScale(maturityMonths[ix]);
+      positions[idx + 1] = yScale(val);
+      positions[idx + 2] = zScale(iz);
+
+      const color = new THREE.Color(colorScale(val));
+      colors[idx]     = color.r;
+      colors[idx + 1] = color.g;
+      colors[idx + 2] = color.b;
+    }
+  }
+
+  const indices = [];
+  for (let iz = 0; iz < numZ - 1; iz++) {
+    for (let ix = 0; ix < numX - 1; ix++) {
+      const a = iz * numX + ix;
+      const b = a + 1;
+      const c = a + numX;
+      const d = c + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+  });
+
+  return new THREE.Mesh(geometry, material);
+}
+
+// ===== SECTION 8: GRID LINES =====
+function buildGridLines(data) {
+  const group = new THREE.Group();
+  const { maturityMonths, curves } = data;
+  const numX = maturityMonths.length;
+  const numZ = curves.length;
+
+  const surfaceLineMat = new THREE.LineBasicMaterial({
+    color: CONFIG.gridColor,
+    opacity: CONFIG.gridOpacity,
+    transparent: true,
+  });
+
+  // Lines along date axis (one per maturity)
+  for (let ix = 0; ix < numX; ix++) {
+    const points = [];
+    for (let iz = 0; iz < numZ; iz++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(
+        xScale(maturityMonths[ix]),
+        yScale(val),
+        zScale(iz)
+      ));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    group.add(new THREE.Line(geom, surfaceLineMat));
+  }
+
+  // Lines along maturity axis (sampled dates)
+  const dateStep = Math.max(1, Math.floor(numZ / 24));
+  for (let iz = 0; iz < numZ; iz += dateStep) {
+    const points = [];
+    for (let ix = 0; ix < numX; ix++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(
+        xScale(maturityMonths[ix]),
+        yScale(val),
+        zScale(iz)
+      ));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    group.add(new THREE.Line(geom, surfaceLineMat));
+  }
+  // Last date line
+  {
+    const iz = numZ - 1;
+    const points = [];
+    for (let ix = 0; ix < numX; ix++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(
+        xScale(maturityMonths[ix]),
+        yScale(val),
+        zScale(iz)
+      ));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    group.add(new THREE.Line(geom, surfaceLineMat));
+  }
+
+  return group;
+}
+
+// ===== SECTION 9: BOUNDING BOX / FLOOR GRID =====
+function buildBoundingBox() {
+  const group = new THREE.Group();
+  const W = CONFIG.surfaceWidth;
+  const H = CONFIG.surfaceHeight;
+  const D = CONFIG.surfaceDepth;
+
+  const axisMat = new THREE.LineBasicMaterial({ color: 0x999999, opacity: 0.5, transparent: true });
+
+  // Floor rectangle
+  const floor = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(W, 0, 0),
+    new THREE.Vector3(W, 0, D),
+    new THREE.Vector3(0, 0, D),
+    new THREE.Vector3(0, 0, 0),
+  ];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(floor), axisMat));
+
+  // Vertical edges
+  [[0, 0], [W, 0], [W, D], [0, D]].forEach(([x, z]) => {
+    const pts = [new THREE.Vector3(x, 0, z), new THREE.Vector3(x, H, z)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), axisMat));
+  });
+
+  // Top rectangle
+  const top = [
+    new THREE.Vector3(0, H, 0),
+    new THREE.Vector3(W, H, 0),
+    new THREE.Vector3(W, H, D),
+    new THREE.Vector3(0, H, D),
+    new THREE.Vector3(0, H, 0),
+  ];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(top), axisMat));
+
+  // Floor grid lines (yield ticks)
+  const gridMat = new THREE.LineBasicMaterial({ color: 0xcccccc, opacity: 0.3, transparent: true });
+  const yTicks = d3.ticks(yieldMin, yieldMax, 6);
+  yTicks.forEach(tick => {
+    const y = yScale(tick);
+    // Left wall
+    const pts1 = [new THREE.Vector3(0, y, 0), new THREE.Vector3(0, y, D)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts1), gridMat));
+    // Back wall
+    const pts2 = [new THREE.Vector3(0, y, 0), new THREE.Vector3(W, y, 0)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts2), gridMat));
+  });
+
+  return group;
+}
+
+// ===== SECTION 10: AXIS LABELS =====
+function clearLabels() {
+  labelElements.forEach(el => el.remove());
+  labelElements = [];
+}
+
+function createLabels(data) {
+  const container = document.getElementById('chart-container');
+  const { maturities, maturityMonths, curves } = data;
+
+  // Yield axis labels (left wall, z=0)
+  const yTicks = d3.ticks(yieldMin, yieldMax, 6);
+  yTicks.forEach(tick => {
+    const el = makeLabel(`${tick}%`);
+    el._anchor = new THREE.Vector3(-1.5, yScale(tick), -0.5);
+    container.appendChild(el);
+    labelElements.push(el);
+  });
+
+  // Yield axis title
+  const yTitle = makeLabel('Yield (%)', true);
+  yTitle._anchor = new THREE.Vector3(-3, yScale((yieldMin + yieldMax) / 2), -1);
+  container.appendChild(yTitle);
+  labelElements.push(yTitle);
+
+  // Maturity axis labels (front edge, z = surfaceDepth)
+  const labelIndices = selectLabelIndices(maturities);
+  labelIndices.forEach(ix => {
+    const el = makeLabel(maturities[ix]);
+    el._anchor = new THREE.Vector3(xScale(maturityMonths[ix]), -1, CONFIG.surfaceDepth + 1.5);
+    container.appendChild(el);
+    labelElements.push(el);
+  });
+
+  // Maturity axis title
+  const xTitle = makeLabel('Maturity', true);
+  xTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth / 2, -2.5, CONFIG.surfaceDepth + 3);
+  container.appendChild(xTitle);
+  labelElements.push(xTitle);
+
+  // Date axis labels (right edge, x = surfaceWidth)
+  const years = new Set();
+  curves.forEach((c, iz) => {
+    const year = c.date.slice(0, 4);
+    if (!years.has(year)) {
+      years.add(year);
+      const el = makeLabel(year);
+      el._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 2, -1, zScale(iz));
+      container.appendChild(el);
+      labelElements.push(el);
+    }
+  });
+
+  // Date axis title
+  const zTitle = makeLabel('Date', true);
+  zTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 4, -2.5, CONFIG.surfaceDepth / 2);
+  container.appendChild(zTitle);
+  labelElements.push(zTitle);
+}
+
+function makeLabel(text, isTitle = false) {
+  const el = document.createElement('div');
+  el.className = 'axis-label' + (isTitle ? ' title' : '');
+  el.textContent = text;
+  return el;
+}
+
+function selectLabelIndices(maturities) {
+  if (maturities.length <= 6) return maturities.map((_, i) => i);
+  // Pick ~6 evenly spaced + first + last
+  const indices = new Set([0, maturities.length - 1]);
+  const step = (maturities.length - 1) / 5;
+  for (let i = 0; i < 6; i++) indices.add(Math.round(i * step));
+  return [...indices].sort((a, b) => a - b);
+}
+
+function updateLabels() {
+  const container = document.getElementById('chart-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  labelElements.forEach(el => {
+    if (!el._anchor) return;
+    const pos = el._anchor.clone().project(camera);
+    const x = (pos.x * 0.5 + 0.5) * w;
+    const y = (-pos.y * 0.5 + 0.5) * h;
+
+    if (pos.z > 1 || x < -50 || x > w + 50 || y < -50 || y > h + 50) {
+      el.style.opacity = '0';
+    } else {
+      el.style.opacity = '1';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.transform = 'translate(-50%, -50%)';
+    }
+  });
+}
+
+// ===== SECTION 11: COLOR LEGEND =====
+function buildLegend() {
+  const canvas = document.getElementById('legend-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  for (let i = 0; i < w; i++) {
+    const t = i / (w - 1);
+    const val = yieldMin + t * (yieldMax - yieldMin);
+    ctx.fillStyle = colorScale(val);
+    ctx.fillRect(i, 0, 1, h);
+  }
+
+  document.getElementById('legend-min').textContent = yieldMin.toFixed(1) + '%';
+  document.getElementById('legend-max').textContent = yieldMax.toFixed(1) + '%';
+}
+
+// ===== SECTION 12: DATA INFO =====
+function updateDataInfo(data) {
+  const { maturities, curves } = data;
+  const first = curves[0].date;
+  const last = curves[curves.length - 1].date;
+  document.getElementById('data-info').textContent =
+    `${curves.length} dates (${first} ~ ${last}) | ${maturities.length} maturities (${maturities[0]} ~ ${maturities[maturities.length - 1]})`;
+}
+
+// ===== SECTION 13: CAMERA PRESETS & ANIMATION =====
+function animateToPreset(name) {
+  const preset = CAMERA_PRESETS[name];
+  if (!preset) return;
+
+  animStartPos = camera.position.clone();
+  animEndPos = new THREE.Vector3(...preset.position);
+  animStartTarget = controls.target.clone();
+  animEndTarget = new THREE.Vector3(...preset.target);
+  animFrame = 0;
+  animating = true;
+
+  // Update active button
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === name);
+  });
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ===== SECTION 14: CSV PARSING =====
+function parseMaturityToMonths(name) {
+  const s = name.trim().toUpperCase();
+  const match = s.match(/^(\d+(?:\.\d+)?)\s*(M|Y|MO|YR|MONTH|YEAR|MONTHS|YEARS)$/);
+  if (match) {
+    const num = parseFloat(match[1]);
+    const unit = match[2];
+    if (unit.startsWith('Y')) return num * 12;
+    return num;
+  }
+  // Try common patterns: "X1M" -> 1 month, "X10Y" -> 120 months
+  const match2 = s.match(/^X?(\d+)(M|Y)$/);
+  if (match2) {
+    const num = parseFloat(match2[1]);
+    return match2[2] === 'Y' ? num * 12 : num;
+  }
+  return null;
+}
+
+function parseCSV(text) {
+  const parsed = d3.csvParse(text.trim());
+  if (parsed.length === 0) throw new Error('CSV is empty');
+
+  const columns = parsed.columns.filter(c => c.toLowerCase() !== 'date');
+  if (columns.length === 0) throw new Error('No maturity columns found (need columns besides "date")');
+
+  const maturities = columns;
+  const maturityMonths = columns.map(parseMaturityToMonths);
+
+  // If we can't parse maturity names, use evenly-spaced indices
+  const hasValidMonths = maturityMonths.every(m => m !== null);
+  const finalMonths = hasValidMonths
+    ? maturityMonths
+    : columns.map((_, i) => (i + 1) * 12);
+
+  const curves = parsed.map(row => ({
+    date: row.date || row.Date || row.DATE || Object.values(row)[0],
+    yields: columns.map(col => {
+      const v = parseFloat(row[col]);
+      return isNaN(v) ? 0 : v;
+    }),
+  }));
+
+  return {
+    maturities,
+    maturityMonths: finalMonths,
+    curves,
+  };
+}
+
+function handleCSVFile(file) {
+  if (!file || !file.name.endsWith('.csv')) {
+    alert('Please select a .csv file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = parseCSV(e.target.result);
+      if (data.curves.length < 2) throw new Error('Need at least 2 data rows');
+      document.getElementById('sample-select').value = '';
+      loadData(data);
+    } catch (err) {
+      alert('CSV parse error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===== SECTION 15: EVENT LISTENERS =====
+function setupEventListeners() {
+  // Sample data selector
+  document.getElementById('sample-select').addEventListener('change', (e) => {
+    const key = e.target.value;
+    if (!key) return;
+    let data = SAMPLE_DATASETS[key];
+    if (key === 'random') data = generateRandomData();
+    loadData(data);
+  });
+
+  // Color scheme selector
+  document.getElementById('color-select').addEventListener('change', (e) => {
+    currentColorScheme = e.target.value;
+    updateColors();
+  });
+
+  // CSV upload button
+  document.getElementById('csv-btn').addEventListener('click', () => {
+    document.getElementById('csv-input').click();
+  });
+  document.getElementById('csv-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) handleCSVFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // Drag & drop
+  const container = document.getElementById('chart-container');
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    container.classList.add('dragover');
+  });
+  container.addEventListener('dragleave', () => {
+    container.classList.remove('dragover');
+  });
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    container.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleCSVFile(file);
+  });
+
+  // Camera preset buttons
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => animateToPreset(btn.dataset.view));
+  });
+}
+
+// ===== SECTION 16: RESIZE =====
+function onResize() {
+  const container = document.getElementById('chart-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  if (w === 0 || h === 0) return;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+// ===== SECTION 17: ANIMATION LOOP =====
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Camera transition
+  if (animating) {
+    animFrame++;
+    const t = easeInOutCubic(Math.min(animFrame / CONFIG.transitionFrames, 1));
+    camera.position.lerpVectors(animStartPos, animEndPos, t);
+    controls.target.lerpVectors(animStartTarget, animEndTarget, t);
+    if (animFrame >= CONFIG.transitionFrames) animating = false;
+  }
+
+  controls.update();
+  updateLabels();
+  renderer.render(scene, camera);
+}
+
+// ===== INIT =====
+init();
+</script>
+</body>
+</html>
