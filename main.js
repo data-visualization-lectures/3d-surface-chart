@@ -1135,6 +1135,8 @@ function getProjectData() {
       colorScheme: currentColorScheme,
       zeroCentered: zeroCentered,
       labelOrient: document.getElementById('label-orient').value,
+      cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
+      cameraTarget: [controls.target.x, controls.target.y, controls.target.z],
     },
   };
 }
@@ -1168,6 +1170,13 @@ function restoreProject(project) {
       document.querySelectorAll('.category-label').forEach(el => {
         el.classList.toggle('vertical', isVertical);
       });
+    }
+    if (settings.cameraPosition) {
+      camera.position.set(...settings.cameraPosition);
+    }
+    if (settings.cameraTarget) {
+      controls.target.set(...settings.cameraTarget);
+      controls.update();
     }
     updateColors();
   }

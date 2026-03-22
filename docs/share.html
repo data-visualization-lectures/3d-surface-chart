@@ -660,15 +660,16 @@ async function main() {
     container.appendChild(renderer.domElement);
 
     camera = new THREE.PerspectiveCamera(CONFIG.cameraFov, 2, 0.1, 1000);
-    const preset = CAMERA_PRESETS.overview;
-    camera.position.set(...preset.position);
+    const camPos = settings.cameraPosition || CAMERA_PRESETS.overview.position;
+    const camTgt = settings.cameraTarget || CAMERA_PRESETS.overview.target;
+    camera.position.set(...camPos);
 
     scene = new THREE.Scene();
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.target.set(...preset.target);
+    controls.target.set(...camTgt);
     controls.update();
 
     // Resize
