@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -29,35 +29,28 @@
   <div id="controls">
     <!-- Data controls -->
     <select id="sample-select">
-      <optgroup label="財務省 過去の金利情報 (1974-)">
-        <option value="mof-recent5">直近5年</option>
-        <option value="mof-recent10">直近10年</option>
-        <option value="mof-2020s">2020年代</option>
-        <option value="mof-2010s">2010年代</option>
-        <option value="mof-2000s">2000年代</option>
-        <option value="mof-1990s">1990年代</option>
-        <option value="mof-1980s">1980年代</option>
-        <option value="mof-all">全期間 (1974-)</option>
+      <optgroup id="mof-optgroup" label="">
+        <option value="mof-recent5" data-i18n="recent5"></option>
+        <option value="mof-recent10" data-i18n="recent10"></option>
+        <option value="mof-2020s" data-i18n="decade2020"></option>
+        <option value="mof-2010s" data-i18n="decade2010"></option>
+        <option value="mof-2000s" data-i18n="decade2000"></option>
+        <option value="mof-1990s" data-i18n="decade1990"></option>
+        <option value="mof-1980s" data-i18n="decade1980"></option>
+        <option value="mof-all" data-i18n="allPeriod"></option>
       </optgroup>
       <option value="us">US Treasury (2019-2024)</option>
-      <option value="jp">Japan JGB (2019-2024)</option>
       <option value="random">Random Demo</option>
     </select>
-    <button id="csv-btn">Load CSV</button>
+    <button id="csv-btn" data-i18n="loadCsv"></button>
     <input type="file" id="csv-input" accept=".csv" style="display:none">
-    <span class="help-tip">CSV format ?<span class="help-tooltip">CSV format:
-date,1M,3M,6M,1Y,2Y,5Y,10Y,30Y
-2024-01-02,5.53,5.47,5.36,5.01,4.40,3.98,3.95,4.10
-...
-First column: date (YYYY-MM-DD)
-Other columns: maturity labels with yield values
-Maturity names: use M for months, Y for years</span></span>
+    <span class="help-tip"><span data-i18n="csvFormatHelp"></span><span class="help-tooltip" data-i18n="csvTooltip"></span></span>
 
     <div class="separator"></div>
 
     <!-- Color scheme -->
     <select id="color-select">
-      <optgroup label="連続的 (Sequential)">
+      <optgroup id="seq-optgroup" label="">
         <option value="YlOrRd" selected>YlOrRd</option>
         <option value="YlGnBu">YlGnBu</option>
         <option value="Viridis">Viridis</option>
@@ -71,7 +64,7 @@ Maturity names: use M for months, Y for years</span></span>
         <option value="Reds">Reds</option>
         <option value="Purples">Purples</option>
       </optgroup>
-      <optgroup label="分岐的 (Diverging)">
+      <optgroup id="div-optgroup" label="">
         <option value="RdBu">RdBu</option>
         <option value="RdYlBu">RdYlBu</option>
         <option value="RdYlGn">RdYlGn</option>
@@ -84,7 +77,7 @@ Maturity names: use M for months, Y for years</span></span>
       </optgroup>
     </select>
     <label id="zero-center-label" style="display:none; font-size:0.8rem; cursor:pointer;">
-      <input type="checkbox" id="zero-center"> 0基準
+      <input type="checkbox" id="zero-center"> <span data-i18n="zeroBasis"></span>
     </label>
 
     <div class="separator"></div>
@@ -97,14 +90,14 @@ Maturity names: use M for months, Y for years</span></span>
   </div>
 
   <div id="chart-container">
-    <div id="drop-overlay">Drop CSV file here</div>
+    <div id="drop-overlay" data-i18n="dropCsv"></div>
   </div>
 
   <div id="legend">
     <span class="legend-label" id="legend-min"></span>
     <canvas id="legend-canvas" width="250" height="16"></canvas>
     <span class="legend-label" id="legend-max"></span>
-    <span style="margin-left:8px">Yield (%)</span>
+    <span style="margin-left:8px" data-i18n="axisValue"></span>
   </div>
 
   <div id="data-info"></div>
