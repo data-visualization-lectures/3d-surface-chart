@@ -24,7 +24,7 @@
 
 <!-- ==================== HTML STRUCTURE ==================== -->
 <div id="app">
-  <h1>3D Surface Chart</h1>
+  <h1 data-i18n="title"></h1>
 
   <div id="controls">
     <!-- Data controls -->
@@ -39,8 +39,8 @@
         <option value="mof-1980s" data-i18n="decade1980"></option>
         <option value="mof-all" data-i18n="allPeriod"></option>
       </optgroup>
-      <option value="us">US Treasury (2019-2024)</option>
-      <option value="random">Random Demo</option>
+      <option value="us" data-i18n="usTreasury"></option>
+      <option value="random" data-i18n="randomDemo"></option>
     </select>
     <button id="csv-btn" data-i18n="loadCsv"></button>
     <input type="file" id="csv-input" accept=".csv" style="display:none">
@@ -82,11 +82,19 @@
 
     <div class="separator"></div>
 
+    <!-- Label orientation -->
+    <select id="label-orient">
+      <option value="horizontal" data-i18n="labelHorizontal"></option>
+      <option value="vertical" data-i18n="labelVertical"></option>
+    </select>
+
+    <div class="separator"></div>
+
     <!-- Camera presets -->
-    <button class="view-btn active" data-view="overview">Overview</button>
-    <button class="view-btn" data-view="front">Front</button>
-    <button class="view-btn" data-view="top">Top</button>
-    <button class="view-btn" data-view="side">Side</button>
+    <button class="view-btn active" data-view="overview" data-i18n="viewOverview"></button>
+    <button class="view-btn" data-view="front" data-i18n="viewFront"></button>
+    <button class="view-btn" data-view="top" data-i18n="viewTop"></button>
+    <button class="view-btn" data-view="side" data-i18n="viewSide"></button>
   </div>
 
   <div id="chart-container">

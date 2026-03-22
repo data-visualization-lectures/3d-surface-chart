@@ -32,6 +32,14 @@ const I18N = {
     ja: (n, f, l, m, mf, ml) => `${n}行 (${f} ~ ${l}) | ${m}列 (${mf} ~ ${ml})`,
     en: (n, f, l, m, mf, ml) => `${n} rows (${f} ~ ${l}) | ${m} columns (${mf} ~ ${ml})`,
   },
+  labelHorizontal: { ja: '横書き', en: 'Horizontal' },
+  labelVertical:   { ja: '縦書き', en: 'Vertical' },
+  viewOverview:    { ja: '全体', en: 'Overview' },
+  viewFront:       { ja: '正面', en: 'Front' },
+  viewTop:         { ja: '上面', en: 'Top' },
+  viewSide:        { ja: '側面', en: 'Side' },
+  usTreasury:      { ja: '米国債 (2019-2024)', en: 'US Treasury (2019-2024)' },
+  randomDemo:      { ja: 'ランダムデモ', en: 'Random Demo' },
   alertCsvFile:    { ja: '.csvファイルを選択してください', en: 'Please select a .csv file' },
   alertFewRows:    { ja: 'データ行が2行以上必要です', en: 'Need at least 2 data rows' },
   alertParseError: { ja: 'CSV解析エラー: ', en: 'CSV parse error: ' },
@@ -552,6 +560,10 @@ function createLabels(data) {
   const labelIndices = selectLabelIndices(maturities);
   labelIndices.forEach(ix => {
     const el = makeLabel(maturities[ix]);
+    el.classList.add('category-label');
+    if (document.getElementById('label-orient').value === 'vertical') {
+      el.classList.add('vertical');
+    }
     el._anchor = new THREE.Vector3(xScale(maturityMonths[ix]), -1, CONFIG.surfaceDepth + 1.5);
     container.appendChild(el);
     labelElements.push(el);
@@ -635,12 +647,8 @@ function makeLabel(text, isTitle = false) {
 }
 
 function selectLabelIndices(maturities) {
-  if (maturities.length <= 6) return maturities.map((_, i) => i);
-  // Pick ~6 evenly spaced + first + last
-  const indices = new Set([0, maturities.length - 1]);
-  const step = (maturities.length - 1) / 5;
-  for (let i = 0; i < 6; i++) indices.add(Math.round(i * step));
-  return [...indices].sort((a, b) => a - b);
+  // Show all labels
+  return maturities.map((_, i) => i);
 }
 
 function updateLabels() {
@@ -709,6 +717,12 @@ function animateToPreset(name) {
   // Update active button
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === name);
+  });
+
+  // Hide category labels in side view
+  const hideCat = name === 'side';
+  document.querySelectorAll('.category-label').forEach(el => {
+    el.style.display = hideCat ? 'none' : '';
   });
 }
 
@@ -827,6 +841,14 @@ function setupEventListeners() {
   zeroCenterCheckbox.addEventListener('change', (e) => {
     zeroCentered = e.target.checked;
     updateColors();
+  });
+
+  // Label orientation selector
+  document.getElementById('label-orient').addEventListener('change', (e) => {
+    const isVertical = e.target.value === 'vertical';
+    document.querySelectorAll('.category-label').forEach(el => {
+      el.classList.toggle('vertical', isVertical);
+    });
   });
 
   // CSV upload button

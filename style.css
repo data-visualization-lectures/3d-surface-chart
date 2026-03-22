@@ -129,6 +129,11 @@ h1 {
   white-space: nowrap;
   transition: opacity 0.1s;
 }
+.axis-label.vertical {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.6rem;
+}
 .axis-label.title {
   font-size: 0.8rem;
   font-weight: 600;
