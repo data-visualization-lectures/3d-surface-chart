@@ -110,6 +110,42 @@ body {
   font-size: 0.9rem;
 }
 #share-cta a:hover { background: #555; }
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+#controls .separator {
+  width: 1px;
+  height: 28px;
+  background: #ccc;
+  margin: 0 4px;
+}
+#controls select,
+#controls button {
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#controls select:hover,
+#controls button:hover {
+  border-color: #888;
+  background: #f0f0f0;
+}
+#controls button.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+#controls button.active:hover {
+  background: #555;
+}
 @media (max-width: 640px) {
   #share-app { padding: 12px; }
   #share-title { font-size: 1.1rem; }
@@ -124,6 +160,57 @@ body {
   <div id="share-error" style="display:none"></div>
   <div id="share-content" style="display:none">
     <h1 id="share-title"></h1>
+
+    <div id="controls">
+      <!-- Color scheme -->
+      <select id="color-select">
+        <optgroup id="seq-optgroup" label="">
+          <option value="YlOrRd" selected>YlOrRd</option>
+          <option value="YlGnBu">YlGnBu</option>
+          <option value="Viridis">Viridis</option>
+          <option value="Inferno">Inferno</option>
+          <option value="Plasma">Plasma</option>
+          <option value="Cividis">Cividis</option>
+          <option value="Turbo">Turbo</option>
+          <option value="Blues">Blues</option>
+          <option value="Greens">Greens</option>
+          <option value="Oranges">Oranges</option>
+          <option value="Reds">Reds</option>
+          <option value="Purples">Purples</option>
+        </optgroup>
+        <optgroup id="div-optgroup" label="">
+          <option value="RdBu">RdBu</option>
+          <option value="RdYlBu">RdYlBu</option>
+          <option value="RdYlGn">RdYlGn</option>
+          <option value="Spectral">Spectral</option>
+          <option value="BrBG">BrBG</option>
+          <option value="PRGn">PRGn</option>
+          <option value="PiYG">PiYG</option>
+          <option value="PuOr">PuOr</option>
+          <option value="RdGy">RdGy</option>
+        </optgroup>
+      </select>
+      <label id="zero-center-label" style="display:none; font-size:0.8rem; cursor:pointer;">
+        <input type="checkbox" id="zero-center"> <span id="zero-center-text"></span>
+      </label>
+
+      <div class="separator"></div>
+
+      <!-- Label orientation -->
+      <select id="label-orient">
+        <option value="horizontal" id="opt-horizontal"></option>
+        <option value="vertical" id="opt-vertical"></option>
+      </select>
+
+      <div class="separator"></div>
+
+      <!-- Camera presets -->
+      <button class="view-btn active" data-view="overview" id="btn-overview"></button>
+      <button class="view-btn" data-view="front" id="btn-front"></button>
+      <button class="view-btn" data-view="top" id="btn-top"></button>
+      <button class="view-btn" data-view="side" id="btn-side"></button>
+    </div>
+
     <div id="chart-container"></div>
     <div id="legend">
       <span class="legend-label" id="legend-min"></span>
@@ -150,6 +237,15 @@ const I18N = {
   axisCategory:{ ja: 'カテゴリ', en: 'Category' },
   axisDate:    { ja: '日付', en: 'Date' },
   ctaText:     { ja: '自分も 3D Surface Chart を作る', en: 'Create your own 3D Surface Chart' },
+  sequential:  { ja: '連続的 (Sequential)', en: 'Sequential' },
+  diverging:   { ja: '分岐的 (Diverging)', en: 'Diverging' },
+  zeroBasis:   { ja: '0基準', en: 'Zero-centered' },
+  labelHorizontal: { ja: '横書き', en: 'Horizontal' },
+  labelVertical:   { ja: '縦書き', en: 'Vertical' },
+  viewOverview:{ ja: '全体', en: 'Overview' },
+  viewFront:   { ja: '正面', en: 'Front' },
+  viewTop:     { ja: '上面', en: 'Top' },
+  viewSide:    { ja: '側面', en: 'Side' },
 };
 function t(key) { return I18N[key][LANG]; }
 
@@ -165,12 +261,31 @@ const CAMERA_PRESETS = {
     position: [-20, 12, 40],
     target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
   },
+  front: {
+    position: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.5, CONFIG.surfaceDepth + 30],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
+  top: {
+    position: [CONFIG.surfaceWidth / 2, 55, CONFIG.surfaceDepth / 2 + 0.1],
+    target: [CONFIG.surfaceWidth / 2, 0, CONFIG.surfaceDepth / 2],
+  },
+  side: {
+    position: [-25, CONFIG.surfaceHeight * 0.6, CONFIG.surfaceDepth / 2],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
 };
+const TRANSITION_FRAMES = 90;
+let animating = false;
+let animStartPos, animEndPos, animStartTarget, animEndTarget, animFrame = 0;
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 // ===== STATE =====
 let renderer, camera, controls, scene;
 let surfaceGroup = null;
 let labelElements = [];
+let currentData = null;
 let yieldMin = 0, yieldMax = 6;
 let xScale, yScale, zScale, colorScale;
 let currentColorScheme = 'YlOrRd';
@@ -194,6 +309,29 @@ function buildColorScale() {
     return d3.scaleDiverging(interp).domain([yieldMax, (yieldMin + yieldMax) / 2, yieldMin]);
   }
   return d3.scaleSequential(interp).domain([yieldMin, yieldMax]);
+}
+
+function updateColors() {
+  if (!currentData || !surfaceGroup) return;
+  colorScale = buildColorScale();
+  surfaceGroup.traverse(obj => {
+    if (obj.isMesh && obj.geometry.getAttribute('color')) {
+      const { maturityMonths, curves } = currentData;
+      const numX = maturityMonths.length;
+      const numZ = curves.length;
+      const colors = obj.geometry.getAttribute('color');
+      for (let iz = 0; iz < numZ; iz++) {
+        for (let ix = 0; ix < numX; ix++) {
+          const idx = iz * numX + ix;
+          const raw = curves[iz].yields[ix];
+          const c = isNaN(raw) ? CONFIG.nanColor : new THREE.Color(colorScale(raw));
+          colors.setXYZ(idx, c.r, c.g, c.b);
+        }
+      }
+      colors.needsUpdate = true;
+    }
+  });
+  buildLegend();
 }
 
 // ===== SURFACE =====
@@ -391,6 +529,7 @@ function buildLegend() {
 
 // ===== LOAD DATA =====
 function loadData(data, labelOrient) {
+  currentData = data;
   const { maturityMonths, curves } = data;
   let allYields = curves.flatMap(c => c.yields).filter(v => !isNaN(v));
   yieldMin = Math.floor(Math.min(...allYields));
@@ -420,8 +559,33 @@ function loadData(data, labelOrient) {
 }
 
 // ===== ANIMATION LOOP =====
+function animateToPreset(name) {
+  const preset = CAMERA_PRESETS[name];
+  if (!preset) return;
+  animStartPos = camera.position.clone();
+  animEndPos = new THREE.Vector3(...preset.position);
+  animStartTarget = controls.target.clone();
+  animEndTarget = new THREE.Vector3(...preset.target);
+  animFrame = 0;
+  animating = true;
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === name);
+  });
+  const hideCat = name === 'side';
+  document.querySelectorAll('.category-label').forEach(el => {
+    el.style.display = hideCat ? 'none' : '';
+  });
+}
+
 function animate() {
   requestAnimationFrame(animate);
+  if (animating) {
+    animFrame++;
+    const t = easeInOutCubic(Math.min(animFrame / TRANSITION_FRAMES, 1));
+    camera.position.lerpVectors(animStartPos, animEndPos, t);
+    controls.target.lerpVectors(animStartTarget, animEndTarget, t);
+    if (animFrame >= TRANSITION_FRAMES) animating = false;
+  }
   controls.update();
   updateLabels();
   renderer.render(scene, camera);
@@ -435,6 +599,17 @@ async function main() {
   document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
   document.getElementById('share-loading').textContent = t('loading');
   document.getElementById('cta-link').textContent = t('ctaText');
+
+  // i18n for controls
+  document.getElementById('seq-optgroup').label = t('sequential');
+  document.getElementById('div-optgroup').label = t('diverging');
+  document.getElementById('zero-center-text').textContent = t('zeroBasis');
+  document.getElementById('opt-horizontal').textContent = t('labelHorizontal');
+  document.getElementById('opt-vertical').textContent = t('labelVertical');
+  document.getElementById('btn-overview').textContent = t('viewOverview');
+  document.getElementById('btn-front').textContent = t('viewFront');
+  document.getElementById('btn-top').textContent = t('viewTop');
+  document.getElementById('btn-side').textContent = t('viewSide');
 
   const shareId = new URLSearchParams(location.search).get('id');
   if (!shareId) {
@@ -508,9 +683,42 @@ async function main() {
     new ResizeObserver(onResize).observe(container);
     window.addEventListener('resize', onResize);
 
+    // Restore UI state from settings
+    if (settings.colorScheme) {
+      document.getElementById('color-select').value = settings.colorScheme;
+      document.getElementById('zero-center-label').style.display = isDiverging() ? '' : 'none';
+    }
+    if (settings.zeroCentered) {
+      document.getElementById('zero-center').checked = true;
+    }
+    if (settings.labelOrient) {
+      document.getElementById('label-orient').value = settings.labelOrient;
+    }
+
     // Load data & start
     loadData(chartData, settings.labelOrient || 'horizontal');
     animate();
+
+    // Event listeners
+    const zeroCenterLabel = document.getElementById('zero-center-label');
+    document.getElementById('color-select').addEventListener('change', (e) => {
+      currentColorScheme = e.target.value;
+      zeroCenterLabel.style.display = isDiverging() ? '' : 'none';
+      updateColors();
+    });
+    document.getElementById('zero-center').addEventListener('change', (e) => {
+      zeroCentered = e.target.checked;
+      updateColors();
+    });
+    document.getElementById('label-orient').addEventListener('change', (e) => {
+      const isVertical = e.target.value === 'vertical';
+      document.querySelectorAll('.category-label').forEach(el => {
+        el.classList.toggle('vertical', isVertical);
+      });
+    });
+    document.querySelectorAll('.view-btn').forEach(btn => {
+      btn.addEventListener('click', () => animateToPreset(btn.dataset.view));
+    });
 
     // Show content
     document.getElementById('share-loading').style.display = 'none';
