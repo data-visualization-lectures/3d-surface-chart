@@ -276,6 +276,15 @@ function updateColors() {
 // ===== SECTION 5: INITIALIZATION =====
 async function init() {
   applyI18n();
+
+  // ツールヘッダー設定
+  const toolHeader = document.querySelector('dataviz-tool-header');
+  if (toolHeader) {
+    toolHeader.setConfig({
+      logo: { type: 'text', text: t('title') },
+    });
+  }
+
   const container = document.getElementById('chart-container');
 
   // Renderer

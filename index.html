@@ -19,12 +19,21 @@
   }
 }
 </script>
+<!-- 1. Supabase クライアント -->
+<script src="https://auth.dataviz.jp/lib/supabase.js"></script>
+
+<!-- 2. 共通ヘッダー + 認証ロジック -->
+<script src="https://auth.dataviz.jp/lib/dataviz-auth-client.js"></script>
+
+<!-- 3. ツールヘッダー -->
+<script src="https://auth.dataviz.jp/lib/dataviz-tool-header.js" defer></script>
 </head>
 <body>
 
+<dataviz-tool-header></dataviz-tool-header>
+
 <!-- ==================== HTML STRUCTURE ==================== -->
 <div id="app">
-  <h1 data-i18n="title"></h1>
 
   <div id="controls">
     <!-- Data controls -->

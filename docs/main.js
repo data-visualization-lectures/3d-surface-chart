@@ -1,6 +1,67 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// ===== SECTION 0: I18N =====
+const LANG = navigator.language.startsWith('ja') ? 'ja' : 'en';
+
+const I18N = {
+  title:           { ja: '3D Surface Chart', en: '3D Surface Chart' },
+  mofGroup:        { ja: '財務省 過去の金利情報 (1974-)', en: 'MOF Historical Interest Rates (1974-)' },
+  recent5:         { ja: '直近5年', en: 'Recent 5 Years' },
+  recent10:        { ja: '直近10年', en: 'Recent 10 Years' },
+  decade2020:      { ja: '2020年代', en: '2020s' },
+  decade2010:      { ja: '2010年代', en: '2010s' },
+  decade2000:      { ja: '2000年代', en: '2000s' },
+  decade1990:      { ja: '1990年代', en: '1990s' },
+  decade1980:      { ja: '1980年代', en: '1980s' },
+  allPeriod:       { ja: '全期間 (1974-)', en: 'All Periods (1974-)' },
+  loadCsv:         { ja: 'CSV読込', en: 'Load CSV' },
+  csvFormatHelp:   { ja: 'CSV形式 ?', en: 'CSV format ?' },
+  csvTooltip: {
+    ja: 'CSV形式:\nlabel,col1,col2,col3,...\n2024-01-02,5.53,5.47,5.36,...\n...\n1列目: 行ラベル（日付等）\nその他の列: 数値データ',
+    en: 'CSV format:\nlabel,col1,col2,col3,...\n2024-01-02,5.53,5.47,5.36,...\n...\nFirst column: row label (e.g. date)\nOther columns: numeric values',
+  },
+  sequential:      { ja: '連続的 (Sequential)', en: 'Sequential' },
+  diverging:       { ja: '分岐的 (Diverging)', en: 'Diverging' },
+  zeroBasis:       { ja: '0基準', en: 'Zero-centered' },
+  dropCsv:         { ja: 'CSVファイルをここにドロップ', en: 'Drop CSV file here' },
+  axisValue:       { ja: '値', en: 'Value' },
+  axisCategory:    { ja: 'カテゴリ', en: 'Category' },
+  axisDate:        { ja: '日付', en: 'Date' },
+  dataInfo: {
+    ja: (n, f, l, m, mf, ml) => `${n}行 (${f} ~ ${l}) | ${m}列 (${mf} ~ ${ml})`,
+    en: (n, f, l, m, mf, ml) => `${n} rows (${f} ~ ${l}) | ${m} columns (${mf} ~ ${ml})`,
+  },
+  labelHorizontal: { ja: '横書き', en: 'Horizontal' },
+  labelVertical:   { ja: '縦書き', en: 'Vertical' },
+  viewOverview:    { ja: '全体', en: 'Overview' },
+  viewFront:       { ja: '正面', en: 'Front' },
+  viewTop:         { ja: '上面', en: 'Top' },
+  viewSide:        { ja: '側面', en: 'Side' },
+  usTreasury:      { ja: '米国債 (2019-2024)', en: 'US Treasury (2019-2024)' },
+  randomDemo:      { ja: 'ランダムデモ', en: 'Random Demo' },
+  alertCsvFile:    { ja: '.csvファイルを選択してください', en: 'Please select a .csv file' },
+  alertFewRows:    { ja: 'データ行が2行以上必要です', en: 'Need at least 2 data rows' },
+  alertParseError: { ja: 'CSV解析エラー: ', en: 'CSV parse error: ' },
+};
+
+function t(key) { return I18N[key][LANG]; }
+
+function applyI18n() {
+  document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
+  document.title = t('title');
+
+  // data-i18n 属性を持つ要素にテキストを適用
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+
+  // optgroup の label 属性
+  document.getElementById('mof-optgroup').label = t('mofGroup');
+  document.getElementById('seq-optgroup').label = t('sequential');
+  document.getElementById('div-optgroup').label = t('diverging');
+}
+
 // ===== SECTION 1: CONFIGURATION =====
 const CONFIG = {
   surfaceWidth: 30,
@@ -39,7 +100,6 @@ const CAMERA_PRESETS = {
 // CSV file paths for sample datasets
 const SAMPLE_CSV = {
   us: 'data/us-treasury.csv',
-  jp: 'data/japan-jgb.csv',
 };
 
 // Cache for fetched sample data
@@ -50,10 +110,11 @@ async function fetchSampleCSV(url) {
   const response = await fetch(url);
   const text = await response.text();
   const parsed = d3.csvParse(text.trim());
-  const maturities = parsed.columns.filter(c => c.toLowerCase() !== 'date');
+  const indexCol = parsed.columns[0];
+  const maturities = parsed.columns.slice(1);
   const maturityMonths = maturities.map(parseMaturityToMonths);
   const curves = parsed.map(row => ({
-    date: row.date,
+    date: row[indexCol],
     yields: maturities.map(col => {
       const v = parseFloat(row[col]);
       return isNaN(v) ? NaN : v;
@@ -88,7 +149,7 @@ function generateRandomData() {
 }
 
 // ===== SECTION 3b: MOF CSV DATA =====
-const MOF_CSV_FILE = 'jgbcm-all.csv';
+const MOF_CSV_FILE = 'data/jgbcm-all.csv';
 
 let mofCurves = null; // loaded on demand
 let mofMaturities = [];
@@ -214,6 +275,16 @@ function updateColors() {
 
 // ===== SECTION 5: INITIALIZATION =====
 async function init() {
+  applyI18n();
+
+  // ツールヘッダー設定
+  const toolHeader = document.querySelector('dataviz-tool-header');
+  if (toolHeader) {
+    toolHeader.setConfig({
+      logo: { type: 'text', text: t('title') },
+    });
+  }
+
   const container = document.getElementById('chart-container');
 
   // Renderer
@@ -245,9 +316,10 @@ async function init() {
   // Event listeners
   setupEventListeners();
 
-  // Load default data
-  const defaultData = await fetchSampleCSV(SAMPLE_CSV.us);
-  loadData(defaultData);
+  // Load default data (matches dropdown default: mof-recent5)
+  const defaultPeriod = MOF_PERIODS['mof-recent5'];
+  await fetchMOFData();
+  loadData(getMOFFilteredData(defaultPeriod.start, defaultPeriod.end));
 
   // Animation loop
   animate();
@@ -481,14 +553,14 @@ function createLabels(data) {
   // Yield axis labels (front-right edge, closest to camera)
   const yTicks = d3.ticks(yieldMin, yieldMax, 6);
   yTicks.forEach(tick => {
-    const el = makeLabel(`${tick}%`);
+    const el = makeLabel(`${tick}`);
     el._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 1.5, yScale(tick), CONFIG.surfaceDepth + 0.5);
     container.appendChild(el);
     labelElements.push(el);
   });
 
   // Yield axis title
-  const yTitle = makeLabel('Yield (%)', true);
+  const yTitle = makeLabel(t('axisValue'), true);
   yTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 3, yScale((yieldMin + yieldMax) / 2), CONFIG.surfaceDepth + 1);
   container.appendChild(yTitle);
   labelElements.push(yTitle);
@@ -497,13 +569,17 @@ function createLabels(data) {
   const labelIndices = selectLabelIndices(maturities);
   labelIndices.forEach(ix => {
     const el = makeLabel(maturities[ix]);
+    el.classList.add('category-label');
+    if (document.getElementById('label-orient').value === 'vertical') {
+      el.classList.add('vertical');
+    }
     el._anchor = new THREE.Vector3(xScale(maturityMonths[ix]), -1, CONFIG.surfaceDepth + 1.5);
     container.appendChild(el);
     labelElements.push(el);
   });
 
   // Maturity axis title
-  const xTitle = makeLabel('Maturity', true);
+  const xTitle = makeLabel(t('axisCategory'), true);
   xTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth / 2, -2.5, CONFIG.surfaceDepth + 3);
   container.appendChild(xTitle);
   labelElements.push(xTitle);
@@ -566,7 +642,7 @@ function createLabels(data) {
   }
 
   // Date axis title
-  const zTitle = makeLabel('Date', true);
+  const zTitle = makeLabel(t('axisDate'), true);
   zTitle._anchor = new THREE.Vector3(-4, -2.5, CONFIG.surfaceDepth / 2);
   container.appendChild(zTitle);
   labelElements.push(zTitle);
@@ -580,12 +656,8 @@ function makeLabel(text, isTitle = false) {
 }
 
 function selectLabelIndices(maturities) {
-  if (maturities.length <= 6) return maturities.map((_, i) => i);
-  // Pick ~6 evenly spaced + first + last
-  const indices = new Set([0, maturities.length - 1]);
-  const step = (maturities.length - 1) / 5;
-  for (let i = 0; i < 6; i++) indices.add(Math.round(i * step));
-  return [...indices].sort((a, b) => a - b);
+  // Show all labels
+  return maturities.map((_, i) => i);
 }
 
 function updateLabels() {
@@ -625,8 +697,8 @@ function buildLegend() {
     ctx.fillRect(i, 0, 1, h);
   }
 
-  document.getElementById('legend-min').textContent = yieldMin.toFixed(1) + '%';
-  document.getElementById('legend-max').textContent = yieldMax.toFixed(1) + '%';
+  document.getElementById('legend-min').textContent = yieldMin.toFixed(1);
+  document.getElementById('legend-max').textContent = yieldMax.toFixed(1);
 }
 
 // ===== SECTION 12: DATA INFO =====
@@ -634,8 +706,9 @@ function updateDataInfo(data) {
   const { maturities, curves } = data;
   const first = curves[0].date;
   const last = curves[curves.length - 1].date;
+  const fmt = I18N.dataInfo[LANG];
   document.getElementById('data-info').textContent =
-    `${curves.length} dates (${first} ~ ${last}) | ${maturities.length} maturities (${maturities[0]} ~ ${maturities[maturities.length - 1]})`;
+    fmt(curves.length, first, last, maturities.length, maturities[0], maturities[maturities.length - 1]);
 }
 
 // ===== SECTION 13: CAMERA PRESETS & ANIMATION =====
@@ -653,6 +726,12 @@ function animateToPreset(name) {
   // Update active button
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === name);
+  });
+
+  // Hide category labels in side view
+  const hideCat = name === 'side';
+  document.querySelectorAll('.category-label').forEach(el => {
+    el.style.display = hideCat ? 'none' : '';
   });
 }
 
@@ -683,8 +762,10 @@ function parseCSV(text) {
   const parsed = d3.csvParse(text.trim());
   if (parsed.length === 0) throw new Error('CSV is empty');
 
-  const columns = parsed.columns.filter(c => c.toLowerCase() !== 'date');
-  if (columns.length === 0) throw new Error('No maturity columns found (need columns besides "date")');
+  // 1列目をインデックス（行ラベル）、残りをデータ列とする
+  const indexCol = parsed.columns[0];
+  const columns = parsed.columns.slice(1);
+  if (columns.length === 0) throw new Error('No data columns found (need at least 2 columns)');
 
   const maturities = columns;
   const maturityMonths = columns.map(parseMaturityToMonths);
@@ -696,7 +777,7 @@ function parseCSV(text) {
     : columns.map((_, i) => (i + 1) * 12);
 
   const curves = parsed.map(row => ({
-    date: row.date || row.Date || row.DATE || Object.values(row)[0],
+    date: row[indexCol],
     yields: columns.map(col => {
       const v = parseFloat(row[col]);
       return isNaN(v) ? 0 : v;
@@ -712,18 +793,18 @@ function parseCSV(text) {
 
 function handleCSVFile(file) {
   if (!file || !file.name.endsWith('.csv')) {
-    alert('Please select a .csv file');
+    alert(t('alertCsvFile'));
     return;
   }
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = parseCSV(e.target.result);
-      if (data.curves.length < 2) throw new Error('Need at least 2 data rows');
+      if (data.curves.length < 2) throw new Error(t('alertFewRows'));
       document.getElementById('sample-select').value = '';
       loadData(data);
     } catch (err) {
-      alert('CSV parse error: ' + err.message);
+      alert(t('alertParseError') + err.message);
     }
   };
   reader.readAsText(file);
@@ -769,6 +850,14 @@ function setupEventListeners() {
   zeroCenterCheckbox.addEventListener('change', (e) => {
     zeroCentered = e.target.checked;
     updateColors();
+  });
+
+  // Label orientation selector
+  document.getElementById('label-orient').addEventListener('change', (e) => {
+    const isVertical = e.target.value === 'vertical';
+    document.querySelectorAll('.category-label').forEach(el => {
+      el.classList.toggle('vertical', isVertical);
+    });
   });
 
   // CSV upload button
