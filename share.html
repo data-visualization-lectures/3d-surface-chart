@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Surface Chart</title>
+
+<!-- OGP meta tags (updated dynamically) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="3D Surface Chart">
+<meta property="og:image" content="">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="3D Surface Chart">
+<meta name="twitter:image" content="">
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+}
+#share-app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+#share-loading {
+  text-align: center;
+  padding: 80px 20px;
+  font-size: 1.1rem;
+  color: #888;
+}
+#share-error {
+  text-align: center;
+  padding: 80px 20px;
+  font-size: 1.1rem;
+  color: #c33;
+}
+#share-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+#chart-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 400px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+#chart-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.axis-label {
+  position: absolute;
+  font-size: 0.7rem;
+  color: #666;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+.axis-label.vertical {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.6rem;
+}
+.axis-label.title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+}
+#legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: #666;
+}
+#legend canvas { border-radius: 3px; border: 1px solid #ddd; }
+#legend .legend-label { min-width: 30px; }
+#share-cta {
+  margin-top: 24px;
+  text-align: center;
+}
+#share-cta a {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #333;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+#share-cta a:hover { background: #555; }
+@media (max-width: 640px) {
+  #share-app { padding: 12px; }
+  #share-title { font-size: 1.1rem; }
+  #chart-container { aspect-ratio: 4 / 3; min-height: 300px; }
+}
+</style>
+</head>
+<body>
+
+<div id="share-app">
+  <div id="share-loading"></div>
+  <div id="share-error" style="display:none"></div>
+  <div id="share-content" style="display:none">
+    <h1 id="share-title"></h1>
+    <div id="chart-container"></div>
+    <div id="legend">
+      <span class="legend-label" id="legend-min"></span>
+      <canvas id="legend-canvas" width="250" height="16"></canvas>
+      <span class="legend-label" id="legend-max"></span>
+    </div>
+    <div id="share-cta">
+      <a id="cta-link" href="index.html"></a>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ===== I18N =====
+const LANG = navigator.language.startsWith('ja') ? 'ja' : 'en';
+const I18N = {
+  loading:     { ja: '読み込み中...', en: 'Loading...' },
+  errorNotFound: { ja: 'シェアデータが見つかりません', en: 'Shared chart not found' },
+  errorLoad:   { ja: '読み込みに失敗しました', en: 'Failed to load chart' },
+  axisValue:   { ja: '値', en: 'Value' },
+  axisCategory:{ ja: 'カテゴリ', en: 'Category' },
+  axisDate:    { ja: '日付', en: 'Date' },
+  ctaText:     { ja: '自分も 3D Surface Chart を作る', en: 'Create your own 3D Surface Chart' },
+};
+function t(key) { return I18N[key][LANG]; }
+
+// ===== CONFIG =====
+const CONFIG = {
+  surfaceWidth: 30, surfaceHeight: 12, surfaceDepth: 30,
+  gridOpacity: 0.25, gridColor: 0x555555, bgColor: 0xffffff,
+  cameraFov: 45, nanColor: new THREE.Color(0xbbbbbb),
+};
+
+const CAMERA_PRESETS = {
+  overview: {
+    position: [-20, 12, 40],
+    target: [CONFIG.surfaceWidth / 2, CONFIG.surfaceHeight * 0.3, CONFIG.surfaceDepth / 2],
+  },
+};
+
+// ===== STATE =====
+let renderer, camera, controls, scene;
+let surfaceGroup = null;
+let labelElements = [];
+let yieldMin = 0, yieldMax = 6;
+let xScale, yScale, zScale, colorScale;
+let currentColorScheme = 'YlOrRd';
+let zeroCentered = false;
+
+// ===== COLOR =====
+const DIVERGING_SCHEMES = new Set([
+  'RdBu','RdYlBu','RdYlGn','Spectral','BrBG','PRGn','PiYG','PuOr','RdGy'
+]);
+function getInterpolator(name) {
+  return d3['interpolate' + name] || d3.interpolateYlOrRd;
+}
+function isDiverging() { return DIVERGING_SCHEMES.has(currentColorScheme); }
+function buildColorScale() {
+  const interp = getInterpolator(currentColorScheme);
+  if (isDiverging() && zeroCentered) {
+    const absMax = Math.max(Math.abs(yieldMin), Math.abs(yieldMax));
+    return d3.scaleDiverging(interp).domain([absMax, 0, -absMax]);
+  }
+  if (isDiverging()) {
+    return d3.scaleDiverging(interp).domain([yieldMax, (yieldMin + yieldMax) / 2, yieldMin]);
+  }
+  return d3.scaleSequential(interp).domain([yieldMin, yieldMax]);
+}
+
+// ===== SURFACE =====
+function buildSurface(data) {
+  const { maturityMonths, curves } = data;
+  const numX = maturityMonths.length;
+  const numZ = curves.length;
+  const totalVerts = numX * numZ;
+  const positions = new Float32Array(totalVerts * 3);
+  const colors = new Float32Array(totalVerts * 3);
+  for (let iz = 0; iz < numZ; iz++) {
+    for (let ix = 0; ix < numX; ix++) {
+      const idx = (iz * numX + ix) * 3;
+      const yieldVal = curves[iz].yields[ix];
+      const val = isNaN(yieldVal) ? 0 : yieldVal;
+      positions[idx]     = xScale(maturityMonths[ix]);
+      positions[idx + 1] = yScale(val);
+      positions[idx + 2] = zScale(iz);
+      const color = isNaN(yieldVal) ? CONFIG.nanColor : new THREE.Color(colorScale(val));
+      colors[idx]     = color.r;
+      colors[idx + 1] = color.g;
+      colors[idx + 2] = color.b;
+    }
+  }
+  const indices = [];
+  for (let iz = 0; iz < numZ - 1; iz++) {
+    for (let ix = 0; ix < numX - 1; ix++) {
+      const a = iz * numX + ix;
+      const b = a + 1;
+      const c = a + numX;
+      const d = c + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+}
+
+function buildGridLines(data) {
+  const group = new THREE.Group();
+  const { maturityMonths, curves } = data;
+  const numX = maturityMonths.length;
+  const numZ = curves.length;
+  const mat = new THREE.LineBasicMaterial({ color: CONFIG.gridColor, opacity: CONFIG.gridOpacity, transparent: true });
+  for (let ix = 0; ix < numX; ix++) {
+    const points = [];
+    for (let iz = 0; iz < numZ; iz++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
+  }
+  const dateStep = Math.max(1, Math.floor(numZ / 24));
+  for (let iz = 0; iz < numZ; iz += dateStep) {
+    const points = [];
+    for (let ix = 0; ix < numX; ix++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
+  }
+  {
+    const iz = numZ - 1;
+    const points = [];
+    for (let ix = 0; ix < numX; ix++) {
+      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
+  }
+  return group;
+}
+
+function buildBoundingBox() {
+  const group = new THREE.Group();
+  const W = CONFIG.surfaceWidth, H = CONFIG.surfaceHeight, D = CONFIG.surfaceDepth;
+  const axisMat = new THREE.LineBasicMaterial({ color: 0x999999, opacity: 0.5, transparent: true });
+  const floor = [new THREE.Vector3(0,0,0), new THREE.Vector3(W,0,0), new THREE.Vector3(W,0,D), new THREE.Vector3(0,0,D), new THREE.Vector3(0,0,0)];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(floor), axisMat));
+  [[0,0],[W,0],[W,D],[0,D]].forEach(([x,z]) => {
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0,z), new THREE.Vector3(x,H,z)]), axisMat));
+  });
+  const top = [new THREE.Vector3(0,H,0), new THREE.Vector3(W,H,0), new THREE.Vector3(W,H,D), new THREE.Vector3(0,H,D), new THREE.Vector3(0,H,0)];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(top), axisMat));
+  const gridMat = new THREE.LineBasicMaterial({ color: 0xcccccc, opacity: 0.3, transparent: true });
+  d3.ticks(yieldMin, yieldMax, 6).forEach(tick => {
+    const y = yScale(tick);
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,y,0), new THREE.Vector3(0,y,D)]), gridMat));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,y,0), new THREE.Vector3(W,y,0)]), gridMat));
+  });
+  return group;
+}
+
+// ===== LABELS =====
+function makeLabel(text, isTitle = false) {
+  const el = document.createElement('div');
+  el.className = 'axis-label' + (isTitle ? ' title' : '');
+  el.textContent = text;
+  return el;
+}
+
+function createLabels(data, labelOrient) {
+  const container = document.getElementById('chart-container');
+  const { maturities, maturityMonths, curves } = data;
+  const yTicks = d3.ticks(yieldMin, yieldMax, 6);
+  yTicks.forEach(tick => {
+    const el = makeLabel(`${tick}`);
+    el._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 1.5, yScale(tick), CONFIG.surfaceDepth + 0.5);
+    container.appendChild(el); labelElements.push(el);
+  });
+  const yTitle = makeLabel(t('axisValue'), true);
+  yTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth + 3, yScale((yieldMin + yieldMax) / 2), CONFIG.surfaceDepth + 1);
+  container.appendChild(yTitle); labelElements.push(yTitle);
+
+  maturities.forEach((m, ix) => {
+    const el = makeLabel(m);
+    el.classList.add('category-label');
+    if (labelOrient === 'vertical') el.classList.add('vertical');
+    el._anchor = new THREE.Vector3(xScale(maturityMonths[ix]), -1, CONFIG.surfaceDepth + 1.5);
+    container.appendChild(el); labelElements.push(el);
+  });
+  const xTitle = makeLabel(t('axisCategory'), true);
+  xTitle._anchor = new THREE.Vector3(CONFIG.surfaceWidth / 2, -2.5, CONFIG.surfaceDepth + 3);
+  container.appendChild(xTitle); labelElements.push(xTitle);
+
+  const firstDate = curves[0].date;
+  const lastDate = curves[curves.length - 1].date;
+  const spanYears = (new Date(lastDate) - new Date(firstDate)) / (365.25 * 24 * 3600 * 1000);
+  if (spanYears <= 3) {
+    const monthEntries = []; const seenMonths = new Set();
+    curves.forEach((c, iz) => { const key = c.date.slice(0, 7); if (!seenMonths.has(key)) { seenMonths.add(key); monthEntries.push({ label: key, iz }); } });
+    const step = Math.max(1, Math.ceil(monthEntries.length / 12));
+    monthEntries.forEach((entry, i) => {
+      if (i === 0 || i === monthEntries.length - 1 || i % step === 0) {
+        const el = makeLabel(entry.label);
+        el._anchor = new THREE.Vector3(-2, -1, zScale(entry.iz));
+        container.appendChild(el); labelElements.push(el);
+      }
+    });
+  } else {
+    const yearEntries = []; const seenYears = new Set();
+    curves.forEach((c, iz) => { const year = parseInt(c.date.slice(0, 4)); if (!seenYears.has(year)) { seenYears.add(year); yearEntries.push({ year, iz }); } });
+    const tickYears = new Set(d3.ticks(yearEntries[0].year, yearEntries[yearEntries.length - 1].year, 10).map(Math.round));
+    tickYears.add(yearEntries[0].year); tickYears.add(yearEntries[yearEntries.length - 1].year);
+    yearEntries.forEach(entry => {
+      if (tickYears.has(entry.year)) {
+        const el = makeLabel(String(entry.year));
+        el._anchor = new THREE.Vector3(-2, -1, zScale(entry.iz));
+        container.appendChild(el); labelElements.push(el);
+      }
+    });
+  }
+  const zTitle = makeLabel(t('axisDate'), true);
+  zTitle._anchor = new THREE.Vector3(-4, -2.5, CONFIG.surfaceDepth / 2);
+  container.appendChild(zTitle); labelElements.push(zTitle);
+}
+
+function updateLabels() {
+  const container = document.getElementById('chart-container');
+  const w = container.clientWidth, h = container.clientHeight;
+  labelElements.forEach(el => {
+    if (!el._anchor) return;
+    const pos = el._anchor.clone().project(camera);
+    const x = (pos.x * 0.5 + 0.5) * w;
+    const y = (-pos.y * 0.5 + 0.5) * h;
+    if (pos.z > 1 || x < -50 || x > w + 50 || y < -50 || y > h + 50) {
+      el.style.opacity = '0';
+    } else {
+      el.style.opacity = '1'; el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.style.transform = 'translate(-50%, -50%)';
+    }
+  });
+}
+
+// ===== LEGEND =====
+function buildLegend() {
+  const canvas = document.getElementById('legend-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  for (let i = 0; i < w; i++) {
+    const t = i / (w - 1);
+    const val = yieldMin + t * (yieldMax - yieldMin);
+    ctx.fillStyle = colorScale(val);
+    ctx.fillRect(i, 0, 1, h);
+  }
+  document.getElementById('legend-min').textContent = yieldMin.toFixed(1);
+  document.getElementById('legend-max').textContent = yieldMax.toFixed(1);
+}
+
+// ===== LOAD DATA =====
+function loadData(data, labelOrient) {
+  const { maturityMonths, curves } = data;
+  let allYields = curves.flatMap(c => c.yields).filter(v => !isNaN(v));
+  yieldMin = Math.floor(Math.min(...allYields));
+  yieldMax = Math.ceil(Math.max(...allYields));
+  if (yieldMin === yieldMax) { yieldMin -= 1; yieldMax += 1; }
+
+  xScale = d3.scaleLinear().domain([d3.min(maturityMonths), d3.max(maturityMonths)]).range([0, CONFIG.surfaceWidth]);
+  yScale = d3.scaleLinear().domain([yieldMin, yieldMax]).range([0, CONFIG.surfaceHeight]);
+  zScale = d3.scaleLinear().domain([0, curves.length - 1]).range([0, CONFIG.surfaceDepth]);
+  colorScale = buildColorScale();
+
+  if (surfaceGroup) {
+    scene.remove(surfaceGroup);
+    surfaceGroup.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); if (obj.material) obj.material.dispose(); });
+  }
+  labelElements.forEach(el => el.remove());
+  labelElements = [];
+
+  surfaceGroup = new THREE.Group();
+  surfaceGroup.add(buildSurface(data));
+  surfaceGroup.add(buildGridLines(data));
+  surfaceGroup.add(buildBoundingBox());
+  scene.add(surfaceGroup);
+
+  createLabels(data, labelOrient);
+  buildLegend();
+}
+
+// ===== ANIMATION LOOP =====
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  updateLabels();
+  renderer.render(scene, camera);
+}
+
+// ===== MAIN =====
+const SUPABASE_URL = 'https://vebhoeiltxspsurqoxvl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlYmhvZWlsdHhzcHN1cnFveHZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTY4MjMsImV4cCI6MjA4MDYzMjgyM30.5uf-D07Hb0JxL39X9yQ20P-5gFc1CRMdKWhDySrNZ0E';
+
+async function main() {
+  document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
+  document.getElementById('share-loading').textContent = t('loading');
+  document.getElementById('cta-link').textContent = t('ctaText');
+
+  const shareId = new URLSearchParams(location.search).get('id');
+  if (!shareId) {
+    document.getElementById('share-loading').style.display = 'none';
+    document.getElementById('share-error').style.display = '';
+    document.getElementById('share-error').textContent = t('errorNotFound');
+    return;
+  }
+
+  try {
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: share, error } = await sb
+      .from('surface_3d_shares')
+      .select('*')
+      .eq('id', shareId)
+      .single();
+
+    if (error || !share) throw new Error(t('errorNotFound'));
+
+    const project = share.chart_config;
+    const chartData = project.data;
+    const settings = project.settings || {};
+
+    if (!chartData || !chartData.curves || chartData.curves.length < 2) {
+      throw new Error(t('errorNotFound'));
+    }
+
+    // Apply settings
+    if (settings.colorScheme) currentColorScheme = settings.colorScheme;
+    if (settings.zeroCentered !== undefined) zeroCentered = settings.zeroCentered;
+
+    // Update page
+    document.title = share.title + ' | 3D Surface Chart';
+    document.getElementById('share-title').textContent = share.title;
+
+    // Update OGP meta tags
+    const ogImage = `${SUPABASE_URL}/storage/v1/object/public/surface-3d-og-images/${shareId}.png`;
+    document.querySelector('meta[property="og:title"]').content = share.title;
+    document.querySelector('meta[property="og:image"]').content = ogImage;
+    document.querySelector('meta[name="twitter:title"]').content = share.title;
+    document.querySelector('meta[name="twitter:image"]').content = ogImage;
+
+    // Init Three.js
+    const container = document.getElementById('chart-container');
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(CONFIG.bgColor);
+    container.appendChild(renderer.domElement);
+
+    camera = new THREE.PerspectiveCamera(CONFIG.cameraFov, 2, 0.1, 1000);
+    const preset = CAMERA_PRESETS.overview;
+    camera.position.set(...preset.position);
+
+    scene = new THREE.Scene();
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(...preset.target);
+    controls.update();
+
+    // Resize
+    function onResize() {
+      const w = container.clientWidth, h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    onResize();
+    new ResizeObserver(onResize).observe(container);
+    window.addEventListener('resize', onResize);
+
+    // Load data & start
+    loadData(chartData, settings.labelOrient || 'horizontal');
+    animate();
+
+    // Show content
+    document.getElementById('share-loading').style.display = 'none';
+    document.getElementById('share-content').style.display = '';
+
+  } catch (err) {
+    document.getElementById('share-loading').style.display = 'none';
+    document.getElementById('share-error').style.display = '';
+    document.getElementById('share-error').textContent = t('errorLoad') + ': ' + err.message;
+  }
+}
+
+main();
+</script>
+</body>
+</html>

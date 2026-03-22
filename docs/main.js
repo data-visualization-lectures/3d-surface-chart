@@ -34,6 +34,15 @@ const I18N = {
   },
   labelHorizontal: { ja: '横書き', en: 'Horizontal' },
   labelVertical:   { ja: '縦書き', en: 'Vertical' },
+  shareChart:      { ja: 'シェア', en: 'Share' },
+  shareTitle:      { ja: 'シェアするチャートのタイトルを入力:', en: 'Enter a title for the shared chart:' },
+  shareFailed:     { ja: 'シェアに失敗: ', en: 'Share failed: ' },
+  shareNoData:     { ja: 'データがありません', en: 'No data loaded' },
+  shareCopyUrl:    { ja: 'URLをコピー', en: 'Copy URL' },
+  shareCopied:     { ja: 'コピーしました!', en: 'Copied!' },
+  shareOnX:        { ja: 'Xでシェア', en: 'Share on X' },
+  shareClose:      { ja: '閉じる', en: 'Close' },
+  shareModalTitle: { ja: 'シェアURLが作成されました', en: 'Share URL created' },
   saveProject:     { ja: 'プロジェクトの保存', en: 'Save Project' },
   loadProject:     { ja: 'プロジェクトの読込', en: 'Load Project' },
   viewOverview:    { ja: '全体', en: 'Overview' },
@@ -267,6 +276,7 @@ async function init() {
     toolHeader.setConfig({
       logo: { type: 'text', text: t('title') },
       buttons: [
+        { label: t('shareChart'), action: () => shareToWeb(), align: 'right' },
         { label: t('saveProject'), action: () => saveToCloud(), align: 'right' },
         { label: t('loadProject'), action: () => loadFromCloud(), align: 'right' },
       ],
@@ -954,7 +964,151 @@ async function initDebugPanel() {
   }, 200);
 }
 
-// ===== SECTION 18: PROJECT SAVE/LOAD =====
+// ===== SECTION 18a: SHARE TO WEB =====
+const SUPABASE_URL = 'https://vebhoeiltxspsurqoxvl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlYmhvZWlsdHhzcHN1cnFveHZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTY4MjMsImV4cCI6MjA4MDYzMjgyM30.5uf-D07Hb0JxL39X9yQ20P-5gFc1CRMdKWhDySrNZ0E';
+
+let shareSupabase = null;
+function getShareSupabase() {
+  if (!shareSupabase && window.supabase) {
+    shareSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return shareSupabase;
+}
+
+function generateOgImage(title, callback) {
+  const container = document.getElementById('chart-container');
+  const origWidth = container.clientWidth;
+  const origHeight = container.clientHeight;
+
+  const OG_W = 1200, OG_H = 630;
+  renderer.setSize(OG_W, OG_H);
+  camera.aspect = OG_W / OG_H;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+
+  const ogCanvas = document.createElement('canvas');
+  ogCanvas.width = OG_W;
+  ogCanvas.height = OG_H;
+  const ctx = ogCanvas.getContext('2d');
+  ctx.drawImage(renderer.domElement, 0, 0, OG_W, OG_H);
+
+  // Title overlay at bottom
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, OG_H - 60, OG_W, 60);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, OG_W / 2, OG_H - 30);
+
+  // Restore original size
+  renderer.setSize(origWidth, origHeight);
+  camera.aspect = origWidth / origHeight;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+
+  ogCanvas.toBlob(blob => callback(blob), 'image/png');
+}
+
+async function shareToWeb() {
+  if (!currentData) {
+    showToast(t('shareNoData'), 'error');
+    return;
+  }
+
+  const sb = getShareSupabase();
+  if (!sb) {
+    showToast(t('shareFailed') + 'Supabase not loaded', 'error');
+    return;
+  }
+
+  const title = prompt(t('shareTitle'));
+  if (!title) return;
+
+  try {
+    const chartConfig = getProjectData();
+    const { data: share, error } = await sb
+      .from('surface_3d_shares')
+      .insert({ title, chart_config: chartConfig })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    // Upload OG image in background
+    generateOgImage(title, async (pngBlob) => {
+      await sb.storage
+        .from('surface-3d-og-images')
+        .upload(`${share.id}.png`, pngBlob, {
+          contentType: 'image/png',
+          upsert: true,
+        });
+    });
+
+    const ogShareUrl = `${SUPABASE_URL}/functions/v1/og-surface-3d-share?id=${share.id}`;
+    showShareModal(ogShareUrl, title);
+
+  } catch (err) {
+    showToast(t('shareFailed') + err.message, 'error');
+  }
+}
+
+function showShareModal(shareUrl, title) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;text-align:center;';
+
+  const h3 = document.createElement('h3');
+  h3.textContent = t('shareModalTitle');
+  h3.style.cssText = 'margin:0 0 16px;font-size:1.1rem;';
+  modal.appendChild(h3);
+
+  const urlBox = document.createElement('input');
+  urlBox.type = 'text';
+  urlBox.readOnly = true;
+  urlBox.value = shareUrl;
+  urlBox.style.cssText = 'width:100%;padding:8px 12px;font-size:0.85rem;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;';
+  modal.appendChild(urlBox);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;flex-wrap:wrap;';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = t('shareCopyUrl');
+  copyBtn.style.cssText = 'padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#e8f4e8;cursor:pointer;font-size:0.9rem;';
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(shareUrl);
+    copyBtn.textContent = t('shareCopied');
+    setTimeout(() => copyBtn.textContent = t('shareCopyUrl'), 2000);
+  });
+  btnRow.appendChild(copyBtn);
+
+  const xBtn = document.createElement('button');
+  xBtn.textContent = t('shareOnX');
+  xBtn.style.cssText = 'padding:8px 20px;border:1px solid #333;border-radius:6px;background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
+  xBtn.addEventListener('click', () => {
+    const text = encodeURIComponent(title);
+    const url = encodeURIComponent(shareUrl);
+    window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+  });
+  btnRow.appendChild(xBtn);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = t('shareClose');
+  closeBtn.style.cssText = 'padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:0.9rem;';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  btnRow.appendChild(closeBtn);
+
+  modal.appendChild(btnRow);
+  overlay.appendChild(modal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ===== SECTION 18b: PROJECT SAVE/LOAD =====
 const API_BASE = 'https://api.dataviz.jp';
 const APP_NAME = '3d-surface-chart';
 

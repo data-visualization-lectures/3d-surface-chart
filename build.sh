@@ -11,6 +11,7 @@ mkdir -p "$DIST/data"
 
 # Copy application files
 cp index.html "$DIST/"
+cp share.html "$DIST/"
 cp style.css "$DIST/"
 cp main.js "$DIST/"
 
