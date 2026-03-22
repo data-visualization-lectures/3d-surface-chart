@@ -115,7 +115,11 @@ async function fetchSampleCSV(url) {
   const parsed = d3.csvParse(text.trim());
   const indexCol = parsed.columns[0];
   const maturities = parsed.columns.slice(1);
-  const maturityMonths = maturities.map(parseMaturityToMonths);
+  const rawMonths = maturities.map(parseMaturityToMonths);
+  const hasValidMonths = rawMonths.every(m => m !== null);
+  const maturityMonths = hasValidMonths
+    ? rawMonths
+    : maturities.map((_, i) => (i + 1) * 12);
   const curves = parsed.map(row => ({
     date: row[indexCol],
     yields: maturities.map(col => {
