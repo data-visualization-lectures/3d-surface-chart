@@ -141,7 +141,7 @@ function generateRandomData() {
 }
 
 // ===== SECTION 3b: MOF CSV DATA =====
-const MOF_CSV_FILE = 'jgbcm-all.csv';
+const MOF_CSV_FILE = 'data/jgbcm-all.csv';
 
 let mofCurves = null; // loaded on demand
 let mofMaturities = [];
