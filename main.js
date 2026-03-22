@@ -34,12 +34,14 @@ const I18N = {
   },
   labelHorizontal: { ja: '横書き', en: 'Horizontal' },
   labelVertical:   { ja: '縦書き', en: 'Vertical' },
+  saveProject:     { ja: 'プロジェクトの保存', en: 'Save Project' },
+  loadProject:     { ja: 'プロジェクトの読込', en: 'Load Project' },
   viewOverview:    { ja: '全体', en: 'Overview' },
   viewFront:       { ja: '正面', en: 'Front' },
   viewTop:         { ja: '上面', en: 'Top' },
   viewSide:        { ja: '側面', en: 'Side' },
   usTreasury:      { ja: '米国債 (2019-2024)', en: 'US Treasury (2019-2024)' },
-  randomDemo:      { ja: 'ランダムデモ', en: 'Random Demo' },
+  numberOfBirths:  { ja: '出生数 都道府県別 (2011-2022)', en: 'Number of Births by Prefecture (2011-2022)' },
   alertCsvFile:    { ja: '.csvファイルを選択してください', en: 'Please select a .csv file' },
   alertFewRows:    { ja: 'データ行が2行以上必要です', en: 'Need at least 2 data rows' },
   alertParseError: { ja: 'CSV解析エラー: ', en: 'CSV parse error: ' },
@@ -100,6 +102,7 @@ const CAMERA_PRESETS = {
 // CSV file paths for sample datasets
 const SAMPLE_CSV = {
   us: 'data/us-treasury.csv',
+  births: 'data/number-of-births.csv',
 };
 
 // Cache for fetched sample data
@@ -123,29 +126,6 @@ async function fetchSampleCSV(url) {
   const data = { maturities, maturityMonths, curves };
   sampleCache[url] = data;
   return data;
-}
-
-// --- Random Demo Generator ---
-function generateRandomData() {
-  const maturities = ['3M','6M','1Y','2Y','5Y','10Y','20Y','30Y'];
-  const maturityMonths = [3, 6, 12, 24, 60, 120, 240, 360];
-  const curves = [];
-  const numDates = 60;
-  let baseRate = 2.0 + Math.random() * 2;
-
-  for (let i = 0; i < numDates; i++) {
-    const d = new Date(2020, i, 1);
-    const dateStr = d.toISOString().slice(0, 10);
-    baseRate += (Math.random() - 0.5) * 0.3;
-    baseRate = Math.max(-0.5, Math.min(7, baseRate));
-    const yields = maturityMonths.map(m => {
-      const spread = Math.log(m / 3 + 1) * (0.8 + Math.random() * 0.4);
-      const noise = (Math.random() - 0.5) * 0.2;
-      return Math.round((baseRate + spread + noise) * 100) / 100;
-    });
-    curves.push({ date: dateStr, yields });
-  }
-  return { maturities, maturityMonths, curves };
 }
 
 // ===== SECTION 3b: MOF CSV DATA =====
@@ -282,6 +262,10 @@ async function init() {
   if (toolHeader) {
     toolHeader.setConfig({
       logo: { type: 'text', text: t('title') },
+      buttons: [
+        { label: t('saveProject'), action: () => saveToCloud(), align: 'right' },
+        { label: t('loadProject'), action: () => loadFromCloud(), align: 'right' },
+      ],
     });
   }
 
@@ -826,11 +810,7 @@ function setupEventListeners() {
       return;
     }
 
-    // Built-in sample data
-    if (key === 'random') {
-      loadData(generateRandomData());
-      return;
-    }
+    // Built-in sample data (CSV)
     const csvUrl = SAMPLE_CSV[key];
     if (csvUrl) loadData(await fetchSampleCSV(csvUrl));
   });
@@ -970,5 +950,234 @@ async function initDebugPanel() {
   }, 200);
 }
 
+// ===== SECTION 18: PROJECT SAVE/LOAD =====
+const API_BASE = 'https://api.dataviz.jp';
+const APP_NAME = '3d-surface-chart';
+
+async function getAccessToken() {
+  if (!window.datavizSupabase) return null;
+  const { data: { session } } = await window.datavizSupabase.auth.getSession();
+  return session ? session.access_token : null;
+}
+
+function showToast(msg, type) {
+  const th = document.querySelector('dataviz-tool-header');
+  if (th && th.showMessage) th.showMessage(msg, type || 'success');
+}
+
+function getProjectData() {
+  return {
+    version: 1,
+    data: currentData,
+    settings: {
+      colorScheme: currentColorScheme,
+      zeroCentered: zeroCentered,
+      labelOrient: document.getElementById('label-orient').value,
+    },
+  };
+}
+
+function restoreProject(project) {
+  const { data, settings } = project;
+  if (!data || !data.curves || data.curves.length < 2) {
+    showToast(t('alertParseError') + 'Invalid project data', 'error');
+    return;
+  }
+
+  // Restore data
+  document.getElementById('sample-select').value = '';
+  loadData(data);
+
+  // Restore settings
+  if (settings) {
+    if (settings.colorScheme) {
+      currentColorScheme = settings.colorScheme;
+      document.getElementById('color-select').value = settings.colorScheme;
+      const zeroCenterLabel = document.getElementById('zero-center-label');
+      zeroCenterLabel.style.display = isDiverging() ? '' : 'none';
+    }
+    if (settings.zeroCentered !== undefined) {
+      zeroCentered = settings.zeroCentered;
+      document.getElementById('zero-center').checked = zeroCentered;
+    }
+    if (settings.labelOrient) {
+      document.getElementById('label-orient').value = settings.labelOrient;
+      const isVertical = settings.labelOrient === 'vertical';
+      document.querySelectorAll('.category-label').forEach(el => {
+        el.classList.toggle('vertical', isVertical);
+      });
+    }
+    updateColors();
+  }
+}
+
+function generateThumbnail(callback) {
+  // Render one frame to ensure canvas is up-to-date
+  renderer.render(scene, camera);
+  const canvas = renderer.domElement;
+
+  // Create thumbnail (max 400px wide)
+  const scale = Math.min(1, 400 / canvas.width);
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = Math.round(canvas.width * scale);
+  thumbCanvas.height = Math.round(canvas.height * scale);
+  const ctx = thumbCanvas.getContext('2d');
+  ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+  callback(thumbCanvas.toDataURL('image/png'));
+}
+
+async function saveToCloud() {
+  const token = await getAccessToken();
+  if (!token) {
+    showToast(LANG === 'ja' ? 'ログインが必要です' : 'Login required', 'error');
+    return;
+  }
+  if (!currentData) {
+    showToast(LANG === 'ja' ? 'データがありません' : 'No data loaded', 'error');
+    return;
+  }
+
+  const name = prompt(LANG === 'ja' ? 'プロジェクト名を入力:' : 'Enter project name:');
+  if (!name) return;
+
+  generateThumbnail(async (thumbnailDataUrl) => {
+    try {
+      const body = {
+        name: name,
+        app_name: APP_NAME,
+        data: getProjectData(),
+        thumbnail: thumbnailDataUrl,
+      };
+
+      const res = await fetch(`${API_BASE}/api/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast(LANG === 'ja' ? '保存しました' : 'Saved successfully', 'success');
+    } catch (err) {
+      showToast((LANG === 'ja' ? '保存に失敗: ' : 'Save failed: ') + err.message, 'error');
+    }
+  });
+}
+
+async function loadFromCloud() {
+  const token = await getAccessToken();
+  if (!token) {
+    showToast(LANG === 'ja' ? 'ログインが必要です' : 'Login required', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/projects?app=${APP_NAME}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const projects = await res.json();
+
+    if (!projects.length) {
+      showToast(LANG === 'ja' ? '保存済みプロジェクトがありません' : 'No saved projects', 'info');
+      return;
+    }
+
+    // Build modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:70vh;overflow-y:auto;';
+
+    const title = document.createElement('h3');
+    title.textContent = LANG === 'ja' ? 'プロジェクトを選択' : 'Select Project';
+    title.style.cssText = 'margin:0 0 16px;font-size:1.1rem;';
+    modal.appendChild(title);
+
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+    projects.forEach(p => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px;border:1px solid #ddd;border-radius:8px;cursor:pointer;transition:background 0.15s;';
+      row.onmouseenter = () => row.style.background = '#f5f5f5';
+      row.onmouseleave = () => row.style.background = '';
+
+      if (p.thumbnail_path) {
+        const img = document.createElement('img');
+        img.src = `${API_BASE}/api/projects/${p.id}/thumbnail`;
+        img.style.cssText = 'width:80px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #eee;';
+        img.onerror = () => img.style.display = 'none';
+        row.appendChild(img);
+      }
+
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+      const nameEl = document.createElement('div');
+      nameEl.textContent = p.name;
+      nameEl.style.cssText = 'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      info.appendChild(nameEl);
+      const dateEl = document.createElement('div');
+      dateEl.textContent = new Date(p.updated_at || p.created_at).toLocaleDateString();
+      dateEl.style.cssText = 'font-size:0.8rem;color:#888;';
+      info.appendChild(dateEl);
+      row.appendChild(info);
+
+      row.addEventListener('click', async () => {
+        overlay.remove();
+        await loadProjectById(p.id);
+      });
+      list.appendChild(row);
+    });
+
+    modal.appendChild(list);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = LANG === 'ja' ? '閉じる' : 'Close';
+    closeBtn.style.cssText = 'margin-top:16px;padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:0.9rem;';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    modal.appendChild(closeBtn);
+
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  } catch (err) {
+    showToast((LANG === 'ja' ? '読込に失敗: ' : 'Load failed: ') + err.message, 'error');
+  }
+}
+
+async function loadProjectById(projectId) {
+  try {
+    const token = await getAccessToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const project = await res.json();
+
+    if (project.data) {
+      restoreProject(project.data);
+      showToast(LANG === 'ja' ? '読込みました' : 'Loaded successfully', 'success');
+    }
+  } catch (err) {
+    showToast((LANG === 'ja' ? '読込に失敗: ' : 'Load failed: ') + err.message, 'error');
+  }
+}
+
 // ===== INIT =====
-init().then(() => initDebugPanel());
+init().then(() => {
+  initDebugPanel();
+
+  // Check URL for project_id parameter
+  const params = new URLSearchParams(window.location.search);
+  const projectId = params.get('project_id');
+  if (projectId) loadProjectById(projectId);
+});
