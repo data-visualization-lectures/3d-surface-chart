@@ -205,6 +205,7 @@ let renderer, camera, controls, scene;
 let surfaceGroup = null;
 let labelElements = [];
 let currentData = null;
+let currentDataName = '';
 let yieldMin = 0, yieldMax = 6;
 let xScale, yScale, zScale, colorScale;
 let currentColorScheme = 'YlOrRd';
@@ -317,6 +318,7 @@ async function init() {
   // Load default data (matches dropdown default: mof-recent5)
   const defaultPeriod = MOF_PERIODS['mof-recent5'];
   await fetchMOFData();
+  currentDataName = t('recent5');
   loadData(getMOFFilteredData(defaultPeriod.start, defaultPeriod.end));
 
   // Animation loop
@@ -800,6 +802,7 @@ function handleCSVFile(file) {
       const data = parseCSV(e.target.result);
       if (data.curves.length < 2) throw new Error(t('alertFewRows'));
       document.getElementById('sample-select').value = '';
+      currentDataName = file.name.replace(/\.csv$/i, '');
       loadData(data);
     } catch (err) {
       alert(t('alertParseError') + err.message);
@@ -814,6 +817,7 @@ function setupEventListeners() {
   document.getElementById('sample-select').addEventListener('change', async (e) => {
     const key = e.target.value;
     if (!key) return;
+    currentDataName = e.target.selectedOptions[0]?.textContent || '';
 
     // MOF CSV data
     if (key.startsWith('mof-')) {
@@ -1023,7 +1027,7 @@ async function shareToWeb() {
     return;
   }
 
-  const title = prompt(t('shareTitle'));
+  const title = prompt(t('shareTitle'), currentDataName);
   if (!title) return;
 
   try {
@@ -1196,7 +1200,7 @@ async function saveToCloud() {
     return;
   }
 
-  const name = prompt(LANG === 'ja' ? 'プロジェクト名を入力:' : 'Enter project name:');
+  const name = prompt(LANG === 'ja' ? 'プロジェクト名を入力:' : 'Enter project name:', currentDataName);
   if (!name) return;
 
   generateThumbnail(async (thumbnailDataUrl) => {
