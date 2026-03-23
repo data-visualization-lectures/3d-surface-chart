@@ -58,7 +58,11 @@ const I18N = {
   alertParseError: { ja: 'CSV解析エラー: ', en: 'CSV parse error: ' },
 };
 
-function t(key) { return I18N[key][LANG]; }
+function t(key) {
+  const entry = I18N[key];
+  if (!entry) return key;
+  return entry[LANG] ?? entry['en'] ?? key;
+}
 
 function applyI18n() {
   document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
@@ -66,7 +70,8 @@ function applyI18n() {
 
   // data-i18n 属性を持つ要素にテキストを適用
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = t(el.dataset.i18n);
+    const val = t(el.dataset.i18n);
+    if (typeof val === 'string') el.textContent = val;
   });
 
   // optgroup の label 属性
