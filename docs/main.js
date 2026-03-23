@@ -1222,11 +1222,15 @@ function exportPng() {
     ctx.textBaseline = 'middle';
 
     if (isVertical) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.PI / 2);
-      ctx.fillText(el.textContent, 0, 0);
-      ctx.restore();
+      // Draw each character vertically (matching CSS writing-mode: vertical-rl)
+      const chars = [...el.textContent];
+      const charH = fontSize * 1.1;
+      const totalH = chars.length * charH;
+      const startY = y - totalH / 2 + charH / 2;
+      ctx.textAlign = 'center';
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, x, startY + i * charH);
+      });
     } else {
       ctx.fillText(el.textContent, x, y);
     }
