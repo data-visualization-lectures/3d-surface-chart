@@ -1188,9 +1188,53 @@ function restoreProject(project) {
 
 function exportPng() {
   renderer.render(scene, camera);
-  const dataUrl = renderer.domElement.toDataURL('image/png');
+  const glCanvas = renderer.domElement;
+  const w = glCanvas.width;
+  const h = glCanvas.height;
+
+  // Composite canvas: WebGL + labels
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = w;
+  exportCanvas.height = h;
+  const ctx = exportCanvas.getContext('2d');
+
+  // Draw WebGL scene
+  ctx.drawImage(glCanvas, 0, 0);
+
+  // Draw labels on top
+  const container = document.getElementById('chart-container');
+  const cw = container.clientWidth;
+  const scaleX = w / cw;
+
+  labelElements.forEach(el => {
+    if (!el._anchor || el.style.opacity === '0' || el.style.display === 'none') return;
+    const pos = el._anchor.clone().project(camera);
+    const x = (pos.x * 0.5 + 0.5) * w;
+    const y = (-pos.y * 0.5 + 0.5) * h;
+    if (pos.z > 1) return;
+
+    const isTitle = el.classList.contains('title');
+    const isVertical = el.classList.contains('vertical');
+    const fontSize = isTitle ? 13 * scaleX : 10 * scaleX;
+    ctx.font = (isTitle ? 'bold ' : '') + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = isTitle ? '#444' : '#666';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (isVertical) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(el.textContent, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(el.textContent, x, y);
+    }
+  });
+
+  // Download
   const a = document.createElement('a');
-  a.href = dataUrl;
+  a.href = exportCanvas.toDataURL('image/png');
   a.download = (currentDataName || '3d-surface-chart') + '.png';
   a.click();
 }
