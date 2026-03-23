@@ -1401,8 +1401,8 @@ async function loadProjectById(projectId) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const project = await res.json();
 
-    if (project.data) {
-      restoreProject(project.data);
+    if (project.data || project.version) {
+      restoreProject(project);
       showToast(LANG === 'ja' ? '読込みました' : 'Loaded successfully', 'success');
     }
   } catch (err) {
