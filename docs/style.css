@@ -177,6 +177,27 @@ body {
   display: flex;
 }
 
+/* Site links */
+.site-links {
+  text-align: center;
+  margin-top: 32px;
+  padding: 16px 0;
+  font-size: 0.8rem;
+  color: #999;
+}
+.site-links a {
+  color: #888;
+  text-decoration: none;
+}
+.site-links a:hover {
+  color: #555;
+  text-decoration: underline;
+}
+.site-links span {
+  margin: 0 6px;
+  color: #ccc;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   #app { padding: 12px; }
