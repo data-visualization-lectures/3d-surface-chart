@@ -1145,6 +1145,7 @@ function getProjectData() {
       colorScheme: currentColorScheme,
       zeroCentered: zeroCentered,
       labelOrient: document.getElementById('label-orient').value,
+      sampleSelect: document.getElementById('sample-select').value,
       cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
       cameraTarget: [controls.target.x, controls.target.y, controls.target.z],
     },
@@ -1159,7 +1160,7 @@ function restoreProject(project) {
   }
 
   // Restore data
-  document.getElementById('sample-select').value = '';
+  document.getElementById('sample-select').value = settings?.sampleSelect || '';
   loadData(data);
 
   // Restore settings
