@@ -54,6 +54,11 @@ body {
   background: #555;
 }
 
+.controls-hint {
+  font-size: 0.7rem;
+  color: #aaa;
+}
+
 #csv-btn {
   background: #e8f4e8 !important;
   border-color: #6a6 !important;

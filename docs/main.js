@@ -50,6 +50,7 @@ const I18N = {
   viewFront:       { ja: '正面', en: 'Front' },
   viewTop:         { ja: '上面', en: 'Top' },
   viewSide:        { ja: '側面', en: 'Side' },
+  shareHint:       { ja: 'シェアボタンは画面下部にあります', en: 'Share button is at the bottom of the page' },
   usTreasury:      { ja: '米国債 (2019-2024)', en: 'US Treasury (2019-2024)' },
   numberOfBirths:  { ja: '出生数 都道府県別 (2011-2022)', en: 'Number of Births by Prefecture (2011-2022)' },
   alertCsvFile:    { ja: '.csvファイルを選択してください', en: 'Please select a .csv file' },
