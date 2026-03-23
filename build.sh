@@ -16,8 +16,10 @@ cp style.css "$DIST/"
 cp main.js "$DIST/"
 
 # Copy data files
-cp jgbcm-all.csv "$DIST/"
 cp data/*.csv "$DIST/data/"
+
+# CNAME for custom domain
+echo "3d-surface-chart.dataviz.jp" > "$DIST/CNAME"
 
 echo "Build complete -> $DIST/"
 ls -lR "$DIST/"
