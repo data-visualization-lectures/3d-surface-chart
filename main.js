@@ -45,6 +45,7 @@ const I18N = {
   shareModalTitle: { ja: 'シェアURLが作成されました', en: 'Share URL created' },
   saveProject:     { ja: 'プロジェクトの保存', en: 'Save Project' },
   loadProject:     { ja: 'プロジェクトの読込', en: 'Load Project' },
+  exportPng:       { ja: 'エクスポート', en: 'Export' },
   viewOverview:    { ja: '全体', en: 'Overview' },
   viewFront:       { ja: '正面', en: 'Front' },
   viewTop:         { ja: '上面', en: 'Top' },
@@ -279,6 +280,7 @@ async function init() {
       buttons: [
         { label: t('saveProject'), action: () => saveToCloud(), align: 'right' },
         { label: t('loadProject'), action: () => loadFromCloud(), align: 'right' },
+        { label: t('exportPng'), action: () => exportPng(), align: 'right' },
       ],
     });
   }
@@ -286,7 +288,7 @@ async function init() {
   const container = document.getElementById('chart-container');
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setClearColor(CONFIG.bgColor);
   container.appendChild(renderer.domElement);
@@ -1182,6 +1184,15 @@ function restoreProject(project) {
     }
     updateColors();
   }
+}
+
+function exportPng() {
+  renderer.render(scene, camera);
+  const dataUrl = renderer.domElement.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = (currentDataName || '3d-surface-chart') + '.png';
+  a.click();
 }
 
 function generateThumbnail(callback) {
