@@ -306,6 +306,9 @@ let xScale, yScale, zScale, colorScale;
 let currentColorScheme = 'YlOrRd';
 let zeroCentered = false;
 
+// NaN or null (JSON.stringify turns NaN into null)
+function isMissing(v) { return v === null || v === undefined || isNaN(v); }
+
 // ===== COLOR =====
 const DIVERGING_SCHEMES = new Set([
   'RdBu','RdYlBu','RdYlGn','Spectral','BrBG','PRGn','PiYG','PuOr','RdGy'
@@ -339,7 +342,7 @@ function updateColors() {
         for (let ix = 0; ix < numX; ix++) {
           const idx = iz * numX + ix;
           const raw = curves[iz].yields[ix];
-          const c = isNaN(raw) ? CONFIG.nanColor : new THREE.Color(colorScale(raw));
+          const c = isMissing(raw) ? CONFIG.nanColor : new THREE.Color(colorScale(raw));
           colors.setXYZ(idx, c.r, c.g, c.b);
         }
       }
@@ -361,11 +364,11 @@ function buildSurface(data) {
     for (let ix = 0; ix < numX; ix++) {
       const idx = (iz * numX + ix) * 3;
       const yieldVal = curves[iz].yields[ix];
-      const val = isNaN(yieldVal) ? 0 : yieldVal;
+      const val = isMissing(yieldVal) ? 0 : yieldVal;
       positions[idx]     = xScale(maturityMonths[ix]);
       positions[idx + 1] = yScale(val);
       positions[idx + 2] = zScale(iz);
-      const color = isNaN(yieldVal) ? CONFIG.nanColor : new THREE.Color(colorScale(val));
+      const color = isMissing(yieldVal) ? CONFIG.nanColor : new THREE.Color(colorScale(val));
       colors[idx]     = color.r;
       colors[idx + 1] = color.g;
       colors[idx + 2] = color.b;
@@ -399,7 +402,7 @@ function buildGridLines(data) {
   for (let ix = 0; ix < numX; ix++) {
     const points = [];
     for (let iz = 0; iz < numZ; iz++) {
-      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      const val = isMissing(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
       points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
     }
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
@@ -408,7 +411,7 @@ function buildGridLines(data) {
   for (let iz = 0; iz < numZ; iz += dateStep) {
     const points = [];
     for (let ix = 0; ix < numX; ix++) {
-      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      const val = isMissing(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
       points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
     }
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
@@ -417,7 +420,7 @@ function buildGridLines(data) {
     const iz = numZ - 1;
     const points = [];
     for (let ix = 0; ix < numX; ix++) {
-      const val = isNaN(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
+      const val = isMissing(curves[iz].yields[ix]) ? 0 : curves[iz].yields[ix];
       points.push(new THREE.Vector3(xScale(maturityMonths[ix]), yScale(val), zScale(iz)));
     }
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat));
@@ -546,7 +549,7 @@ function buildLegend() {
 function loadData(data, labelOrient) {
   currentData = data;
   const { maturityMonths, curves } = data;
-  let allYields = curves.flatMap(c => c.yields).filter(v => !isNaN(v));
+  let allYields = curves.flatMap(c => c.yields).filter(v => !isMissing(v));
   yieldMin = Math.floor(Math.min(...allYields));
   yieldMax = Math.ceil(Math.max(...allYields));
   if (yieldMin === yieldMax) { yieldMin -= 1; yieldMax += 1; }
