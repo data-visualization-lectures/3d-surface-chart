@@ -1162,8 +1162,17 @@ function restoreProject(project) {
     return;
   }
 
-  // Restore data
-  document.getElementById('sample-select').value = settings?.sampleSelect || '';
+  // Restore data & data name
+  const select = document.getElementById('sample-select');
+  select.value = settings?.sampleSelect || '';
+  const selectedOption = select.selectedOptions[0];
+  if (selectedOption && selectedOption.value) {
+    const groupLabel = selectedOption.closest('optgroup')?.label || '';
+    const optionText = selectedOption.textContent || '';
+    currentDataName = groupLabel ? `${groupLabel} ${optionText}` : optionText;
+  } else {
+    currentDataName = '';
+  }
   loadData(data);
 
   // Restore settings
