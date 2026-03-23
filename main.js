@@ -325,7 +325,7 @@ async function init() {
   // Load default data (matches dropdown default: mof-recent5)
   const defaultPeriod = MOF_PERIODS['mof-recent5'];
   await fetchMOFData();
-  currentDataName = t('recent5');
+  currentDataName = `${t('mofGroup')} ${t('recent5')}`;
   loadData(getMOFFilteredData(defaultPeriod.start, defaultPeriod.end));
 
   // Animation loop
@@ -824,7 +824,10 @@ function setupEventListeners() {
   document.getElementById('sample-select').addEventListener('change', async (e) => {
     const key = e.target.value;
     if (!key) return;
-    currentDataName = e.target.selectedOptions[0]?.textContent || '';
+    const selectedOption = e.target.selectedOptions[0];
+    const groupLabel = selectedOption?.closest('optgroup')?.label || '';
+    const optionText = selectedOption?.textContent || '';
+    currentDataName = groupLabel ? `${groupLabel} ${optionText}` : optionText;
 
     // MOF CSV data
     if (key.startsWith('mof-')) {
