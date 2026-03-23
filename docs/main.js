@@ -277,7 +277,6 @@ async function init() {
     toolHeader.setConfig({
       logo: { type: 'text', text: t('title') },
       buttons: [
-        { label: t('shareChart'), action: () => shareToWeb(), align: 'right' },
         { label: t('saveProject'), action: () => saveToCloud(), align: 'right' },
         { label: t('loadProject'), action: () => loadFromCloud(), align: 'right' },
       ],
@@ -887,6 +886,9 @@ function setupEventListeners() {
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.addEventListener('click', () => animateToPreset(btn.dataset.view));
   });
+
+  // Share button
+  document.getElementById('share-btn').addEventListener('click', () => shareToWeb());
 }
 
 // ===== SECTION 16: RESIZE =====
