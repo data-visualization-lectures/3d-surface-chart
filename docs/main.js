@@ -216,6 +216,8 @@ let currentDataName = '';
 let yieldMin = 0, yieldMax = 6;
 let xScale, yScale, zScale, colorScale;
 let currentColorScheme = 'YlOrRd';
+let currentProjectId = null;
+let currentProjectName = null;
 let zeroCentered = false;
 
 // Camera animation
@@ -284,10 +286,29 @@ async function init() {
     toolHeader.setConfig({
       logo: { type: 'text', text: t('title') },
       buttons: [
-        { label: t('saveProject'), action: () => saveToCloud(), align: 'right' },
-        { label: t('loadProject'), action: () => loadFromCloud(), align: 'right' },
+        { label: t('saveProject'), action: () => {
+          toolHeader.showSaveModal({
+            name: currentProjectName || currentDataName,
+            data: getProjectData(),
+            thumbnailDataUri: generateThumbnail(),
+            existingProjectId: currentProjectId,
+          });
+        }, align: 'right' },
+        { label: t('loadProject'), action: () => toolHeader.showLoadModal(), align: 'right' },
         { label: t('exportPng'), action: () => exportPng(), align: 'right' },
       ],
+    });
+
+    toolHeader.setProjectConfig({
+      appName: '3d-surface-chart',
+      apiBaseUrl: 'https://api.dataviz.jp',
+      onProjectLoad: (projectData) => {
+        restoreProject(projectData);
+      },
+      onProjectSave: (meta) => {
+        currentProjectId = meta.id;
+        currentProjectName = meta.name;
+      },
     });
   }
 
@@ -1125,16 +1146,7 @@ function showShareModal(shareUrl, title) {
   document.body.appendChild(overlay);
 }
 
-// ===== SECTION 18b: PROJECT SAVE/LOAD =====
-const API_BASE = 'https://api.dataviz.jp';
-const APP_NAME = '3d-surface-chart';
-
-async function getAccessToken() {
-  if (!window.datavizSupabase) return null;
-  const { data: { session } } = await window.datavizSupabase.auth.getSession();
-  return session ? session.access_token : null;
-}
-
+// ===== SECTION 18b: PROJECT HELPERS =====
 function showToast(msg, type) {
   const th = document.querySelector('dataviz-tool-header');
   if (th && th.showMessage) th.showMessage(msg, type || 'success');
@@ -1262,165 +1274,16 @@ function exportPng() {
   a.click();
 }
 
-function generateThumbnail(callback) {
-  // Render one frame to ensure canvas is up-to-date
+function generateThumbnail() {
   renderer.render(scene, camera);
   const canvas = renderer.domElement;
-
-  // Create thumbnail (max 400px wide)
   const scale = Math.min(1, 400 / canvas.width);
   const thumbCanvas = document.createElement('canvas');
   thumbCanvas.width = Math.round(canvas.width * scale);
   thumbCanvas.height = Math.round(canvas.height * scale);
   const ctx = thumbCanvas.getContext('2d');
   ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-
-  callback(thumbCanvas.toDataURL('image/png'));
-}
-
-async function saveToCloud() {
-  const token = await getAccessToken();
-  if (!token) {
-    showToast(LANG === 'ja' ? 'ログインが必要です' : 'Login required', 'error');
-    return;
-  }
-  if (!currentData) {
-    showToast(LANG === 'ja' ? 'データがありません' : 'No data loaded', 'error');
-    return;
-  }
-
-  const name = prompt(LANG === 'ja' ? 'プロジェクト名を入力:' : 'Enter project name:', currentDataName);
-  if (!name) return;
-
-  generateThumbnail(async (thumbnailDataUrl) => {
-    try {
-      const body = {
-        name: name,
-        app_name: APP_NAME,
-        data: getProjectData(),
-        thumbnail: thumbnailDataUrl,
-      };
-
-      const res = await fetch(`${API_BASE}/api/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      showToast(LANG === 'ja' ? '保存しました' : 'Saved successfully', 'success');
-    } catch (err) {
-      showToast((LANG === 'ja' ? '保存に失敗: ' : 'Save failed: ') + err.message, 'error');
-    }
-  });
-}
-
-async function loadFromCloud() {
-  const token = await getAccessToken();
-  if (!token) {
-    showToast(LANG === 'ja' ? 'ログインが必要です' : 'Login required', 'error');
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/api/projects?app=${APP_NAME}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const projects = await res.json();
-
-    if (!projects.length) {
-      showToast(LANG === 'ja' ? '保存済みプロジェクトがありません' : 'No saved projects', 'info');
-      return;
-    }
-
-    // Build modal
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
-
-    const modal = document.createElement('div');
-    modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:70vh;overflow-y:auto;';
-
-    const title = document.createElement('h3');
-    title.textContent = LANG === 'ja' ? 'プロジェクトを選択' : 'Select Project';
-    title.style.cssText = 'margin:0 0 16px;font-size:1.1rem;';
-    modal.appendChild(title);
-
-    const list = document.createElement('div');
-    list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
-
-    projects.forEach(p => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px;border:1px solid #ddd;border-radius:8px;cursor:pointer;transition:background 0.15s;';
-      row.onmouseenter = () => row.style.background = '#f5f5f5';
-      row.onmouseleave = () => row.style.background = '';
-
-      if (p.thumbnail_path) {
-        const img = document.createElement('img');
-        img.src = `${API_BASE}/api/projects/${p.id}/thumbnail`;
-        img.style.cssText = 'width:80px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #eee;';
-        img.onerror = () => img.style.display = 'none';
-        row.appendChild(img);
-      }
-
-      const info = document.createElement('div');
-      info.style.cssText = 'flex:1;min-width:0;';
-      const nameEl = document.createElement('div');
-      nameEl.textContent = p.name;
-      nameEl.style.cssText = 'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-      info.appendChild(nameEl);
-      const dateEl = document.createElement('div');
-      dateEl.textContent = new Date(p.updated_at || p.created_at).toLocaleDateString();
-      dateEl.style.cssText = 'font-size:0.8rem;color:#888;';
-      info.appendChild(dateEl);
-      row.appendChild(info);
-
-      row.addEventListener('click', async () => {
-        overlay.remove();
-        await loadProjectById(p.id);
-      });
-      list.appendChild(row);
-    });
-
-    modal.appendChild(list);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = LANG === 'ja' ? '閉じる' : 'Close';
-    closeBtn.style.cssText = 'margin-top:16px;padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:0.9rem;';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    modal.appendChild(closeBtn);
-
-    overlay.appendChild(modal);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    document.body.appendChild(overlay);
-  } catch (err) {
-    showToast((LANG === 'ja' ? '読込に失敗: ' : 'Load failed: ') + err.message, 'error');
-  }
-}
-
-async function loadProjectById(projectId) {
-  try {
-    const token = await getAccessToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
-      headers,
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const project = await res.json();
-
-    if (project.data || project.version) {
-      restoreProject(project);
-      showToast(LANG === 'ja' ? '読込みました' : 'Loaded successfully', 'success');
-    }
-  } catch (err) {
-    showToast((LANG === 'ja' ? '読込に失敗: ' : 'Load failed: ') + err.message, 'error');
-  }
+  return thumbCanvas.toDataURL('image/png');
 }
 
 // ===== INIT =====
@@ -1430,5 +1293,15 @@ init().then(() => {
   // Check URL for project_id parameter
   const params = new URLSearchParams(window.location.search);
   const projectId = params.get('project_id');
-  if (projectId) loadProjectById(projectId);
+  if (projectId) {
+    const header = document.querySelector('dataviz-tool-header');
+    if (header) {
+      header.loadProject(projectId).then((projectData) => {
+        if (projectData) {
+          restoreProject(projectData);
+          currentProjectId = projectId;
+        }
+      });
+    }
+  }
 });
