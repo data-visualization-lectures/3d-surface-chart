@@ -276,6 +276,27 @@ function updateColors() {
   buildLegend();
 }
 
+// ===== DEBUG: API レスポンス形式を診断 =====
+const _origFetch = window.fetch;
+window.fetch = async function(...args) {
+  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+  if (url && url.includes('/api/projects')) {
+    console.log('[DEBUG] fetch URL:', url);
+    console.log('[DEBUG] headers:', args[1]?.headers);
+    const response = await _origFetch.apply(this, args);
+    const clone = response.clone();
+    clone.json().then(data => {
+      console.log('[DEBUG] response status:', response.status);
+      console.log('[DEBUG] Array.isArray:', Array.isArray(data));
+      console.log('[DEBUG] typeof data:', typeof data);
+      console.log('[DEBUG] data.projects:', data?.projects);
+      console.log('[DEBUG] data:', data);
+    }).catch(() => {});
+    return response;
+  }
+  return _origFetch.apply(this, args);
+};
+
 // ===== SECTION 5: INITIALIZATION =====
 async function init() {
   applyI18n();
