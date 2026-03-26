@@ -301,6 +301,7 @@ async function init() {
 
     toolHeader.setProjectConfig({
       appName: '3d-surface-chart',
+      apiBaseUrl: 'https://api.dataviz.jp',
       onProjectLoad: (projectData) => {
         restoreProject(projectData);
       },
