@@ -56,6 +56,11 @@ const I18N = {
   alertCsvFile:    { ja: '.csvファイルを選択してください', en: 'Please select a .csv file' },
   alertFewRows:    { ja: 'データ行が2行以上必要です', en: 'Need at least 2 data rows' },
   alertParseError: { ja: 'CSV解析エラー: ', en: 'CSV parse error: ' },
+  publishTitleHeading: { ja: 'シェアするチャートのタイトルを入力', en: 'Enter a title for the shared chart' },
+  publishTitleCancel: { ja: 'キャンセル', en: 'Cancel' },
+  shareModalHeading: { ja: 'シェアURLが作成されました', en: 'Share URL created' },
+  shareModalDesc: { ja: '以下のURLを共有すると、誰でも閲覧できます。', en: 'Anyone with this URL can view it.' },
+  shareSuccess: { ja: '公開しました', en: 'Published successfully' },
 };
 
 function t(key) {
@@ -1061,7 +1066,7 @@ async function shareToWeb() {
     return;
   }
 
-  const title = prompt(t('shareTitle'), currentDataName);
+  const title = await showTitleModal(currentDataName);
   if (!title) return;
 
   try {
@@ -1085,6 +1090,7 @@ async function shareToWeb() {
     });
 
     const ogShareUrl = `${SUPABASE_URL}/functions/v1/og-surface-3d-share?id=${share.id}`;
+    showToast(t('shareSuccess'), 'success');
     showShareModal(ogShareUrl, title);
 
   } catch (err) {
@@ -1092,58 +1098,67 @@ async function shareToWeb() {
   }
 }
 
-function showShareModal(shareUrl, title) {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+function showTitleModal(defaultTitle) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dvz-title-modal');
+    const input = document.getElementById('dvz-title-input');
+    document.getElementById('dvz-title-modal-heading').textContent = t('publishTitleHeading');
+    document.getElementById('dvz-title-cancel').textContent = t('publishTitleCancel');
+    input.value = defaultTitle || '';
+    overlay.classList.add('active');
+    input.focus();
+    input.select();
 
-  const modal = document.createElement('div');
-  modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;text-align:center;';
+    function cleanup() {
+      overlay.classList.remove('active');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlay);
+      input.removeEventListener('keydown', onKey);
+    }
+    function onOk() { cleanup(); resolve(input.value.trim() || null); }
+    function onCancel() { cleanup(); resolve(null); }
+    function onOverlay(e) { if (e.target === overlay) { cleanup(); resolve(null); } }
+    function onKey(e) { if (e.key === 'Enter') onOk(); else if (e.key === 'Escape') onCancel(); }
 
-  const h3 = document.createElement('h3');
-  h3.textContent = t('shareModalTitle');
-  h3.style.cssText = 'margin:0 0 16px;font-size:1.1rem;';
-  modal.appendChild(h3);
-
-  const urlBox = document.createElement('input');
-  urlBox.type = 'text';
-  urlBox.readOnly = true;
-  urlBox.value = shareUrl;
-  urlBox.style.cssText = 'width:100%;padding:8px 12px;font-size:0.85rem;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;';
-  modal.appendChild(urlBox);
-
-  const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;flex-wrap:wrap;';
-
-  const copyBtn = document.createElement('button');
-  copyBtn.textContent = t('shareCopyUrl');
-  copyBtn.style.cssText = 'padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#e8f4e8;cursor:pointer;font-size:0.9rem;';
-  copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(shareUrl);
-    copyBtn.textContent = t('shareCopied');
-    setTimeout(() => copyBtn.textContent = t('shareCopyUrl'), 2000);
+    const okBtn = document.getElementById('dvz-title-ok');
+    const cancelBtn = document.getElementById('dvz-title-cancel');
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlay);
+    input.addEventListener('keydown', onKey);
   });
-  btnRow.appendChild(copyBtn);
+}
 
-  const xBtn = document.createElement('button');
-  xBtn.textContent = t('shareOnX');
-  xBtn.style.cssText = 'padding:8px 20px;border:1px solid #333;border-radius:6px;background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
-  xBtn.addEventListener('click', () => {
-    const text = encodeURIComponent(title);
+function showShareModal(shareUrl, title) {
+  const overlay = document.getElementById('dvz-share-modal');
+  document.getElementById('dvz-share-heading').textContent = t('shareModalHeading');
+  document.getElementById('dvz-share-desc').textContent = t('shareModalDesc');
+  document.getElementById('dvz-share-copy').textContent = t('shareCopyUrl');
+  document.getElementById('dvz-share-x').textContent = t('shareOnX');
+  document.getElementById('dvz-share-close').textContent = t('shareClose');
+  const urlInput = document.getElementById('dvz-share-url');
+  urlInput.value = shareUrl;
+  overlay.classList.add('active');
+  urlInput.focus();
+  urlInput.select();
+
+  const close = () => overlay.classList.remove('active');
+
+  document.getElementById('dvz-share-copy').onclick = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showToast(t('shareCopied'), 'success');
+    });
+  };
+
+  document.getElementById('dvz-share-x').onclick = () => {
+    const text = encodeURIComponent(title || '');
     const url = encodeURIComponent(shareUrl);
     window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank');
-  });
-  btnRow.appendChild(xBtn);
+  };
 
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = t('shareClose');
-  closeBtn.style.cssText = 'padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:0.9rem;';
-  closeBtn.addEventListener('click', () => overlay.remove());
-  btnRow.appendChild(closeBtn);
-
-  modal.appendChild(btnRow);
-  overlay.appendChild(modal);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+  document.getElementById('dvz-share-close').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
 }
 
 // ===== SECTION 18b: PROJECT HELPERS =====

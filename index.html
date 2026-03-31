@@ -143,6 +143,32 @@
   </div>
 </div>
 
+<!-- タイトル入力モーダル -->
+<div class="dvz-modal-overlay" id="dvz-title-modal">
+  <div class="dvz-modal-inner">
+    <h3 id="dvz-title-modal-heading"></h3>
+    <input type="text" id="dvz-title-input">
+    <div class="dvz-modal-actions" style="justify-content:flex-end">
+      <button id="dvz-title-cancel"></button>
+      <button id="dvz-title-ok" class="dvz-btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- シェアURLモーダル -->
+<div class="dvz-modal-overlay" id="dvz-share-modal">
+  <div class="dvz-modal-inner">
+    <h3 id="dvz-share-heading"></h3>
+    <p id="dvz-share-desc" style="font-size:0.9rem;color:#666;margin-bottom:12px"></p>
+    <input type="text" id="dvz-share-url" readonly style="background:#f8f8f8;cursor:text">
+    <div class="dvz-modal-actions">
+      <button id="dvz-share-copy" class="dvz-btn-primary"></button>
+      <button id="dvz-share-x" class="dvz-btn-dark"></button>
+      <button id="dvz-share-close"></button>
+    </div>
+  </div>
+</div>
+
 <script type="module" src="main.js"></script>
 </body>
 </html>
