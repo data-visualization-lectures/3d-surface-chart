@@ -12,7 +12,9 @@
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
 
-  gtag('config', 'G-61Z8R0850T');
+  if (new URLSearchParams(location.search).get('embed') !== '1') {
+    gtag('config', 'G-61Z8R0850T');
+  }
 </script>
 
 <!-- OGP meta tags (updated dynamically) -->
@@ -41,24 +43,24 @@ body {
   background: #f5f5f5;
   color: #333;
 }
-#share-app {
+.dvz-app {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 }
-#share-loading {
+#dvz-loading {
   text-align: center;
   padding: 80px 20px;
   font-size: 1.1rem;
   color: #888;
 }
-#share-error {
+#dvz-error {
   text-align: center;
   padding: 80px 20px;
   font-size: 1.1rem;
   color: #c33;
 }
-#share-title {
+#dvz-title {
   font-size: 1.4rem;
   font-weight: 600;
   margin-bottom: 12px;
@@ -106,11 +108,11 @@ body {
 }
 #legend canvas { border-radius: 3px; border: 1px solid #ddd; }
 #legend .legend-label { min-width: 30px; }
-#share-cta {
+.dvz-cta {
   margin-top: 24px;
   text-align: center;
 }
-#share-cta a {
+.dvz-cta a {
   display: inline-block;
   padding: 10px 24px;
   background: #333;
@@ -119,17 +121,23 @@ body {
   border-radius: 6px;
   font-size: 0.9rem;
 }
-#share-cta a:hover { background: #555; }
-.site-links {
+.dvz-cta a:hover { background: #555; }
+.dvz-site-links {
   text-align: center;
   margin-top: 32px;
   padding: 16px 0;
   font-size: 0.8rem;
   color: #999;
 }
-.site-links a { color: #888; text-decoration: none; }
-.site-links a:hover { color: #555; text-decoration: underline; }
-.site-links span { margin: 0 6px; color: #ccc; }
+.dvz-site-links a {
+  color: #888;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.dvz-site-links a:hover { color: #555; text-decoration: underline; }
+.dvz-site-links span { margin: 0 6px; color: #ccc; }
 #controls {
   display: flex;
   flex-wrap: wrap;
@@ -166,20 +174,42 @@ body {
 #controls button.active:hover {
   background: #555;
 }
-@media (max-width: 640px) {
-  #share-app { padding: 12px; }
-  #share-title { font-size: 1.1rem; }
+/* ---- Embed mode ---- */
+.dvz-embed body {
+  background-color: transparent;
+  background-image: none;
+}
+.dvz-embed .dvz-site-links {
+  display: none;
+}
+.dvz-embed .dvz-app {
+  padding: 12px;
+}
+
+/* タブレット */
+@media (max-width: 768px) {
+  .dvz-app { padding: 16px; }
+  #dvz-title { font-size: 1.1rem; }
   #chart-container { aspect-ratio: 4 / 3; min-height: 300px; }
+  #controls { gap: 6px; }
+  #controls select, #controls button, #controls label { font-size: 0.8rem; }
+}
+
+/* スマートフォン */
+@media (max-width: 480px) {
+  .dvz-app { padding: 12px; }
+  #dvz-title { font-size: 1rem; }
+  #controls select, #controls button, #controls label { font-size: 0.75rem; min-height: 44px; }
 }
 </style>
 </head>
 <body>
 
-<div id="share-app">
-  <div id="share-loading"></div>
-  <div id="share-error" style="display:none"></div>
-  <div id="share-content" style="display:none">
-    <h1 id="share-title"></h1>
+<div class="dvz-app">
+  <div id="dvz-loading"></div>
+  <div id="dvz-error" style="display:none"></div>
+  <div id="dvz-content" style="display:none">
+    <h1 id="dvz-title"></h1>
 
     <div id="controls">
       <!-- Color scheme -->
@@ -237,10 +267,10 @@ body {
       <canvas id="legend-canvas" width="250" height="16"></canvas>
       <span class="legend-label" id="legend-max"></span>
     </div>
-    <div id="share-cta">
-      <a id="cta-link" href="index.html"></a>
+    <div class="dvz-cta">
+      <a id="dvz-cta-link" href="https://3d-surface-chart.dataviz.jp/" target="_blank" rel="noopener"></a>
     </div>
-    <div class="site-links">
+    <div class="dvz-site-links">
       <a href="https://www.dataviz.jp/3d-surface-chart/">3D Surface Chart</a>
       <span>|</span>
       <a href="https://www.dataviz.jp/">データの道具箱</a>
@@ -271,8 +301,35 @@ const I18N = {
   viewFront:   { ja: '正面', en: 'Front' },
   viewTop:     { ja: '上面', en: 'Top' },
   viewSide:    { ja: '側面', en: 'Side' },
+  timeout:     { ja: '読み込みがタイムアウトしました。ページを再読み込みしてください。', en: 'Loading timed out. Please reload the page.' },
 };
 function t(key) { return I18N[key][LANG]; }
+
+const IS_EMBED = new URLSearchParams(location.search).get('embed') === '1';
+
+if (IS_EMBED) {
+  document.documentElement.classList.add('dvz-embed');
+
+  const postHeight = () => {
+    window.parent.postMessage(
+      { type: 'dvz-resize', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  };
+  new ResizeObserver(postHeight).observe(document.body);
+  window.addEventListener('load', postHeight);
+
+  const retargetLinks = () => {
+    document.querySelectorAll('a[href]:not([target="_blank"])').forEach(a => {
+      if (!a.href.startsWith('javascript:')) {
+        a.target = '_blank';
+        a.rel = 'noopener';
+      }
+    });
+  };
+  retargetLinks();
+  new MutationObserver(retargetLinks).observe(document.body, { childList: true, subtree: true });
+}
 
 // ===== CONFIG =====
 const CONFIG = {
@@ -625,8 +682,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 async function main() {
   document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
-  document.getElementById('share-loading').textContent = t('loading');
-  document.getElementById('cta-link').textContent = t('ctaText');
+  const loadingEl = document.getElementById('dvz-loading');
+  const errorEl = document.getElementById('dvz-error');
+  loadingEl.textContent = t('loading');
+  document.getElementById('dvz-cta-link').textContent = t('ctaText');
+
+  const timeout = setTimeout(() => {
+    loadingEl.style.display = 'none';
+    errorEl.style.display = 'block';
+    errorEl.textContent = t('timeout');
+  }, 15000);
 
   // i18n for controls
   document.getElementById('seq-optgroup').label = t('sequential');
@@ -641,9 +706,10 @@ async function main() {
 
   const shareId = new URLSearchParams(location.search).get('id');
   if (!shareId) {
-    document.getElementById('share-loading').style.display = 'none';
-    document.getElementById('share-error').style.display = '';
-    document.getElementById('share-error').textContent = t('errorNotFound');
+    clearTimeout(timeout);
+    loadingEl.style.display = 'none';
+    errorEl.style.display = '';
+    errorEl.textContent = t('errorNotFound');
     return;
   }
 
@@ -671,7 +737,7 @@ async function main() {
 
     // Update page
     document.title = share.title + ' | 3D Surface Chart';
-    document.getElementById('share-title').textContent = share.title;
+    document.getElementById('dvz-title').textContent = share.title;
 
     // Update OGP meta tags
     const ogImage = `${SUPABASE_URL}/storage/v1/object/public/surface-3d-og-images/${shareId}.png`;
@@ -750,13 +816,15 @@ async function main() {
     });
 
     // Show content
-    document.getElementById('share-loading').style.display = 'none';
-    document.getElementById('share-content').style.display = '';
+    clearTimeout(timeout);
+    loadingEl.style.display = 'none';
+    document.getElementById('dvz-content').style.display = '';
 
   } catch (err) {
-    document.getElementById('share-loading').style.display = 'none';
-    document.getElementById('share-error').style.display = '';
-    document.getElementById('share-error').textContent = t('errorLoad') + ': ' + err.message;
+    clearTimeout(timeout);
+    loadingEl.style.display = 'none';
+    errorEl.style.display = '';
+    errorEl.textContent = t('errorLoad') + ': ' + err.message;
   }
 }
 
