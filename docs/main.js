@@ -320,12 +320,23 @@ async function init() {
     toolHeader.setSampleConfig({
       toolId: '3d-surface-chart',
       onSampleSelect: async (detail) => {
-        const res = await fetch(detail.url);
-        const text = await res.text();
         try {
+          // MOF period filter (extra.mofPeriod in catalog entry)
+          const mofPeriodKey = detail.extra?.mofPeriod;
+          if (mofPeriodKey && MOF_PERIODS[mofPeriodKey]) {
+            const period = MOF_PERIODS[mofPeriodKey];
+            await fetchMOFData();
+            currentDataName = detail.name || '';
+            updateDataNameDisplay();
+            loadData(getMOFFilteredData(period.start, period.end));
+            return;
+          }
+          // Normal CSV
+          const res = await fetch(detail.url);
+          const text = await res.text();
           const data = parseCSV(text);
-          document.getElementById('sample-select').value = '';
           currentDataName = detail.name || '';
+          updateDataNameDisplay();
           loadData(data);
         } catch (err) {
           console.error('Sample data load failed:', err);
@@ -369,10 +380,16 @@ async function init() {
   const defaultPeriod = MOF_PERIODS['mof-recent5'];
   await fetchMOFData();
   currentDataName = `${t('mofGroup')} ${t('recent5')}`;
+  updateDataNameDisplay();
   loadData(getMOFFilteredData(defaultPeriod.start, defaultPeriod.end));
 
   // Animation loop
   animate();
+}
+
+function updateDataNameDisplay() {
+  const el = document.getElementById('data-name');
+  if (el) el.textContent = currentDataName || '';
 }
 
 // ===== SECTION 6: DATA LOADING =====
@@ -380,10 +397,18 @@ function loadData(data) {
   currentData = data;
   const { maturityMonths, curves } = data;
 
-  // Compute yield range (ignore NaN)
-  let allYields = curves.flatMap(c => c.yields).filter(v => !isNaN(v));
-  yieldMin = Math.floor(Math.min(...allYields));
-  yieldMax = Math.ceil(Math.max(...allYields));
+  // Compute yield range (ignore NaN) — avoid spread for large arrays
+  let minY = Infinity, maxY = -Infinity;
+  for (const c of curves) {
+    for (const v of c.yields) {
+      if (!isNaN(v)) {
+        if (v < minY) minY = v;
+        if (v > maxY) maxY = v;
+      }
+    }
+  }
+  yieldMin = Math.floor(minY);
+  yieldMax = Math.ceil(maxY);
   if (yieldMin === yieldMax) { yieldMin -= 1; yieldMax += 1; }
 
   // D3 scales
@@ -853,6 +878,7 @@ function handleCSVFile(file) {
       if (data.curves.length < 2) throw new Error(t('alertFewRows'));
       document.getElementById('sample-select').value = '';
       currentDataName = file.name.replace(/\.csv$/i, '');
+      updateDataNameDisplay();
       loadData(data);
     } catch (err) {
       alert(t('alertParseError') + err.message);
@@ -1341,6 +1367,7 @@ init().then(() => {
         const data = parseCSV(text);
         document.getElementById('sample-select').value = '';
         currentDataName = dataUrl.split('/').pop().replace(/\.[^.]+$/, '');
+        updateDataNameDisplay();
         loadData(data);
       })
       .catch(err => console.error('data_url load failed:', err));

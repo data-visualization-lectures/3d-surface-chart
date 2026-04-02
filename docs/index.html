@@ -47,7 +47,7 @@
 
   <div id="controls">
     <!-- Data controls -->
-    <select id="sample-select">
+    <select id="sample-select" style="display:none">
       <optgroup id="mof-optgroup" label="">
         <option value="mof-recent5" data-i18n="recent5"></option>
         <option value="mof-recent10" data-i18n="recent10"></option>
@@ -61,6 +61,7 @@
       <option value="us" data-i18n="usTreasury"></option>
       <option value="births" data-i18n="numberOfBirths"></option>
     </select>
+    <span id="data-name" style="font-size: 0.85rem; color: #ccc; margin-right: 8px;"></span>
     <button id="csv-btn" data-i18n="loadCsv"></button>
     <input type="file" id="csv-input" accept=".csv" style="display:none">
 
