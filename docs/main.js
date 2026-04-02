@@ -315,6 +315,23 @@ async function init() {
         currentProjectName = meta.name;
       },
     });
+
+    // Sample data picker integration
+    toolHeader.setSampleConfig({
+      toolId: '3d-surface-chart',
+      onSampleSelect: async (detail) => {
+        const res = await fetch(detail.url);
+        const text = await res.text();
+        try {
+          const data = parseCSV(text);
+          document.getElementById('sample-select').value = '';
+          currentDataName = detail.name || '';
+          loadData(data);
+        } catch (err) {
+          console.error('Sample data load failed:', err);
+        }
+      },
+    });
   }
 
   const container = document.getElementById('chart-container');
@@ -1071,9 +1088,18 @@ async function shareToWeb() {
 
   try {
     const chartConfig = getProjectData();
+
+    let createdBy = null;
+    try {
+      if (window.datavizSupabase) {
+        const { data: { session } } = await window.datavizSupabase.auth.getSession();
+        createdBy = session?.user?.id || null;
+      }
+    } catch (e) { /* auth unavailable */ }
+
     const { data: share, error } = await sb
       .from('surface_3d_shares')
-      .insert({ title, chart_config: chartConfig })
+      .insert({ title, chart_config: chartConfig, created_by: createdBy })
       .select('id')
       .single();
 
@@ -1305,8 +1331,21 @@ function generateThumbnail() {
 init().then(() => {
   initDebugPanel();
 
-  // Check URL for project_id parameter
+  // Check URL for data_url or project_id parameter
   const params = new URLSearchParams(window.location.search);
+  const dataUrl = params.get('data_url');
+  if (dataUrl) {
+    fetch(dataUrl)
+      .then(res => res.text())
+      .then(text => {
+        const data = parseCSV(text);
+        document.getElementById('sample-select').value = '';
+        currentDataName = dataUrl.split('/').pop().replace(/\.[^.]+$/, '');
+        loadData(data);
+      })
+      .catch(err => console.error('data_url load failed:', err));
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
   const projectId = params.get('project_id');
   if (projectId) {
     const header = document.querySelector('dataviz-tool-header');
