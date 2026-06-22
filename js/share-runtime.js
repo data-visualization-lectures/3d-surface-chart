@@ -45,7 +45,6 @@
       panels: [
         { id: 'tab-data', metaKey: 'sidebarDataHTML', wrapperClass: 'overflow-y-auto' },
         { id: 'tab-mapping', metaKey: 'sidebarMappingHTML' },
-        { id: 'tab-style', metaKey: 'sidebarStyleHTML' },
       ],
     });
   }

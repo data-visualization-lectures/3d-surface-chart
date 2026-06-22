@@ -827,8 +827,9 @@ class DvzApp {
       sourceUrlInput.value = normalizedUrl;
     }
 
+    const sourcePrefix = `${t('annotateSource')}: `;
     if (source && normalizedUrl) {
-      sourceEl.append('Source: ');
+      sourceEl.append(sourcePrefix);
       const link = document.createElement('a');
       link.href = normalizedUrl;
       link.target = '_blank';
@@ -837,7 +838,7 @@ class DvzApp {
       link.textContent = source;
       sourceEl.appendChild(link);
     } else if (source) {
-      sourceEl.textContent = `Source: ${source}`;
+      sourceEl.textContent = `${sourcePrefix}${source}`;
     }
   }
 

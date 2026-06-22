@@ -89,6 +89,7 @@ const I18N = {
   styleXAxisTitle: { ja: 'X軸タイトル', en: 'X Axis Title' },
   styleYAxisTitle: { ja: 'Y軸タイトル', en: 'Y Axis Title' },
   styleZAxisTitle: { ja: 'Z軸タイトル', en: 'Z Axis Title' },
+  styleLabelOrientation: { ja: 'ラベルの向き', en: 'Label Orientation' },
   styleAxisTitleAutoPlaceholder: {
     ja: '未入力時は自動（変数名）',
     en: 'Auto (variable name)',
@@ -425,6 +426,7 @@ let yieldMin = 0, yieldMax = 6;
 let xScale, yScale, zScale, colorScale;
 let currentColorScheme = 'YlOrRd';
 let axisTitleOverrides = { x: '', y: '', z: '' };
+let currentLabelOrient = 'horizontal';
 let currentProjectId = null;
 let currentProjectName = null;
 let zeroCentered = false;
@@ -513,6 +515,19 @@ function syncZeroCenterControl() {
   const zeroCenterLabel = document.getElementById('zero-center-label');
   if (!zeroCenterLabel) return;
   zeroCenterLabel.style.display = isValueColorEncoding() && isDiverging() ? '' : 'none';
+}
+
+function normalizeLabelOrient(value) {
+  return value === 'vertical' ? 'vertical' : 'horizontal';
+}
+
+function setLabelOrient(value) {
+  currentLabelOrient = normalizeLabelOrient(value);
+  const input = document.getElementById('label-orient');
+  if (input) input.value = currentLabelOrient;
+  document.querySelectorAll('.category-label').forEach(el => {
+    el.classList.toggle('vertical', currentLabelOrient === 'vertical');
+  });
 }
 
 function buildColorScale() {
@@ -1235,7 +1250,7 @@ function createLabels(data) {
   xLabelIndices.forEach(ix => {
     const el = makeLabel(mapped.xLabels[ix]);
     el.classList.add('category-label');
-    if (document.getElementById('label-orient').value === 'vertical') {
+    if (currentLabelOrient === 'vertical') {
       el.classList.add('vertical');
     }
     el._anchor = new THREE.Vector3(xScale(mapped.xPositions[ix]), -1, CONFIG.surfaceDepth + 1.5);
@@ -1530,13 +1545,14 @@ function setupEventListeners() {
     });
   });
 
-  // Label orientation selector
-  document.getElementById('label-orient').addEventListener('change', (e) => {
-    const isVertical = e.target.value === 'vertical';
-    document.querySelectorAll('.category-label').forEach(el => {
-      el.classList.toggle('vertical', isVertical);
+  // Label orientation selector (editor-only; shared pages restore this from state)
+  const labelOrientSelect = document.getElementById('label-orient');
+  if (labelOrientSelect) {
+    labelOrientSelect.value = currentLabelOrient;
+    labelOrientSelect.addEventListener('change', (e) => {
+      setLabelOrient(e.target.value);
     });
-  });
+  }
 
   // CSV upload — handled by template dropzone (dvzInitFileUpload) in SurfaceChartApp.start()
   // Legacy CSV button support (if elements exist)
@@ -1789,7 +1805,7 @@ function getProjectData() {
     settings: {
       colorScheme: currentColorScheme,
       zeroCentered: zeroCentered,
-      labelOrient: document.getElementById('label-orient').value,
+      labelOrient: currentLabelOrient,
       encoding: { ...currentEncoding },
       axisTitles: { ...axisTitleOverrides },
       sampleSelect: document.getElementById('sample-select')?.value || '',
@@ -1828,6 +1844,7 @@ function restoreProject(project) {
     y: settings.axisTitles.y.trim(),
     z: settings.axisTitles.z.trim(),
   };
+  setLabelOrient(settings.labelOrient);
   writeAxisTitleInputs();
 
   loadData(parsedData);
@@ -1852,12 +1869,6 @@ function restoreProject(project) {
 
   zeroCentered = settings.zeroCentered;
   document.getElementById('zero-center').checked = zeroCentered;
-
-  document.getElementById('label-orient').value = settings.labelOrient;
-  const isVertical = settings.labelOrient === 'vertical';
-  document.querySelectorAll('.category-label').forEach(el => {
-    el.classList.toggle('vertical', isVertical);
-  });
 
   if (Array.isArray(settings.cameraPosition) && settings.cameraPosition.length >= 3) {
     camera.position.set(...settings.cameraPosition.slice(0, 3));
@@ -2267,6 +2278,13 @@ window.ChartModules['3d-surface-chart'] = {
           </div>
         </div>
       </section>
+      <section class="border-t border-gray-100 px-5 py-4">
+        <label for="label-orient" class="mb-1 block text-xs text-gray-500">${t('styleLabelOrientation')}</label>
+        <select id="label-orient" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none">
+          <option value="horizontal">${t('labelHorizontal')}</option>
+          <option value="vertical">${t('labelVertical')}</option>
+        </select>
+      </section>
     `,
     controlsHTML: `
       <select id="color-select" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-gray-500 focus:outline-none">
@@ -2299,10 +2317,6 @@ window.ChartModules['3d-surface-chart'] = {
       <label id="zero-center-label" class="flex items-center gap-1 text-xs" style="display:none;">
         <input type="checkbox" id="zero-center"> <span>${t('zeroBasis')}</span>
       </label>
-      <select id="label-orient" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-gray-500 focus:outline-none">
-        <option value="horizontal">${t('labelHorizontal')}</option>
-        <option value="vertical">${t('labelVertical')}</option>
-      </select>
       <div class="flex gap-1">
         <button class="view-btn rounded border border-gray-300 bg-white px-2 py-1 text-xs hover:bg-gray-50 active" data-view="overview">${t('viewOverview')}</button>
         <button class="view-btn rounded border border-gray-300 bg-white px-2 py-1 text-xs hover:bg-gray-50" data-view="front">${t('viewFront')}</button>
