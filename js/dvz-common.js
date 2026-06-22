@@ -613,15 +613,21 @@ function dvzHideModal(id) {
   document.getElementById(id)?.classList.remove('active');
 }
 
+function dvzResolveMessageText(msg) {
+  if (typeof msg !== 'string') return msg;
+  const translated = t(msg);
+  return translated === msg ? msg : translated;
+}
+
 function dvzShowToast(msg, type) {
   const th = document.querySelector('dataviz-tool-header');
-  if (th && th.showMessage) th.showMessage(msg, type || 'success');
+  if (th && th.showMessage) th.showMessage(dvzResolveMessageText(msg), type || 'success');
 }
 
 function dvzShowProcessingToast(msg, duration = 5000) {
   const th = document.querySelector('dataviz-tool-header');
   if (th && typeof th.showMessage === 'function') {
-    th.showMessage(msg || t('processingGeneric'), 'info', duration);
+    th.showMessage(dvzResolveMessageText(msg || 'processingGeneric'), 'info', duration);
   }
 }
 

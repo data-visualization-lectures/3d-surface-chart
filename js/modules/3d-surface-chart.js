@@ -114,6 +114,9 @@ const I18N = {
   shareModalHeading: { ja: 'シェアURLが作成されました', en: 'Share URL created' },
   shareModalDesc: { ja: '以下のURLを共有すると、誰でも閲覧できます。', en: 'Anyone with this URL can view it.' },
   shareSuccess: { ja: '公開しました', en: 'Published successfully' },
+  processingGeneric: { ja: '処理中です', en: 'Processing...' },
+  processingSavePrep: { ja: '保存準備中です', en: 'Preparing save...' },
+  processingExport: { ja: '書き出し中です', en: 'Exporting...' },
 };
 
 function t(key) {
@@ -248,7 +251,7 @@ function parseNumericValue(raw) {
   return Number.isFinite(v) ? v : NaN;
 }
 
-function createSurfaceData(indexColName, columns, rows) {
+function createSurfaceData(indexColName, columns, rows, meta = {}) {
   const columnPositionsRaw = columns.map(parseMaturityToMonths);
   const hasParsedColumnPositions = columnPositionsRaw.every(v => v !== null);
   const columnPositions = hasParsedColumnPositions
@@ -261,6 +264,8 @@ function createSurfaceData(indexColName, columns, rows) {
 
   return {
     rowLabelName: indexColName || 'row',
+    columnLabelName: pickLocalizedLabel(meta.columnLabelName || meta.columnVariableName || meta.columnName),
+    valueLabelName: resolveValueLabelMetadata(meta),
     rowLabels,
     rowPositions,
     columnLabels: columns.slice(),
@@ -281,7 +286,7 @@ function normalizeLoadedData(data) {
       label,
       values: Array.isArray(data.matrixValues[i]) ? data.matrixValues[i] : [],
     }));
-    return createSurfaceData(data.rowLabelName || 'row', data.columnLabels, normalizedRows);
+    return createSurfaceData(data.rowLabelName || 'row', data.columnLabels, normalizedRows, data);
   }
 
   if (Array.isArray(data.curves) && Array.isArray(data.maturities)) {
@@ -289,10 +294,50 @@ function normalizeLoadedData(data) {
       label: c.date,
       values: Array.isArray(c.yields) ? c.yields : [],
     }));
-    return createSurfaceData(data.rowLabelName || 'date', data.maturities, rows);
+    return createSurfaceData(data.rowLabelName || 'date', data.maturities, rows, data);
   }
 
   return null;
+}
+
+function pickLocalizedLabel(label) {
+  if (!label) return '';
+  if (typeof label === 'string') return label.trim();
+  if (typeof label === 'object') {
+    return String(label[LANG] ?? label.en ?? label.ja ?? '').trim();
+  }
+  return '';
+}
+
+function inferValueLabelFromSource(sourceName) {
+  const source = String(sourceName || '').toLowerCase();
+  if (source.includes('number-of-births')) {
+    return LANG === 'ja' ? '出生数' : 'Number of Births';
+  }
+  if (source.includes('us-treasury')) {
+    return LANG === 'ja' ? '利回り' : 'Yield';
+  }
+  if (source.includes('jgbcm') || source.includes('mof')) {
+    return LANG === 'ja' ? '金利' : 'Interest Rate';
+  }
+  return '';
+}
+
+function resolveValueLabelMetadata(meta = {}) {
+  const sourceHints = [
+    meta.sourceName,
+    meta.filename,
+    meta.name,
+    meta.url,
+  ].filter(Boolean).join(' ');
+  return pickLocalizedLabel(
+    meta.valueLabelName
+    || meta.valueVariableName
+    || meta.valueName
+    || meta.measureName
+    || meta.yLabelName
+    || inferValueLabelFromSource(sourceHints)
+  );
 }
 
 async function fetchSampleCSV(url) {
@@ -300,7 +345,7 @@ async function fetchSampleCSV(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to fetch sample CSV (${response.status})`);
   const text = await response.text();
-  const data = parseCSV(text);
+  const data = parseCSV(text, { sourceName: url });
   sampleCache[url] = data;
   return data;
 }
@@ -362,7 +407,11 @@ function getMOFFilteredData(startYear, endYear) {
   return createSurfaceData(
     'date',
     mofMaturities,
-    monthly.map(c => ({ label: c.date, values: c.yields }))
+    monthly.map(c => ({ label: c.date, values: c.yields })),
+    {
+      sourceName: MOF_CSV_FILE,
+      valueLabelName: { ja: '金利', en: 'Interest Rate' },
+    }
   );
 }
 
@@ -515,8 +564,17 @@ function getVariableLabel(varType) {
     const rowName = currentData?.rowLabelName ? ` (${currentData.rowLabelName})` : '';
     return t('rowVariable') + rowName;
   }
-  if (varType === 'column') return t('columnVariable');
-  return t('valueVariable');
+  if (varType === 'column') {
+    const columnName = currentData?.columnLabelName ? ` (${currentData.columnLabelName})` : '';
+    return t('columnVariable') + columnName;
+  }
+  const valueName = getValueVariableName();
+  return valueName || t('valueVariable');
+}
+
+function getValueVariableName() {
+  const yTitle = (axisTitleOverrides?.y || '').trim();
+  return yTitle || currentData?.valueLabelName || '';
 }
 
 function updateEncodingUITexts() {
@@ -836,7 +894,11 @@ async function init() {
             const res = await fetch(detail.url);
             if (!res.ok) throw new Error(`Sample fetch failed (${res.status})`);
             const text = await res.text();
-            const data = parseCSV(text);
+            const data = parseCSV(text, {
+              name: detail.name,
+              url: detail.url,
+              sourceName: detail.name || detail.url,
+            });
             currentDataName = detail.name || '';
             updateDataNameDisplay();
             loadData(data);
@@ -1222,8 +1284,8 @@ function selectLabelIndices(labels, maxLabels = 12) {
 
 function getAxisTitle(dim, data) {
   if (dim === 'row') return data?.rowLabelName || t('rowVariable');
-  if (dim === 'column') return t('columnVariable');
-  return t('valueVariable');
+  if (dim === 'column') return data?.columnLabelName || t('columnVariable');
+  return getValueVariableName() || data?.valueLabelName || t('valueVariable');
 }
 
 function resolveAxisTitle(axisKey, dim, data) {
@@ -1345,7 +1407,7 @@ function parseMaturityToMonths(name) {
   return null;
 }
 
-function parseCSV(text) {
+function parseCSV(text, meta = {}) {
   const parsed = d3.csvParse(text.trim());
   if (parsed.length === 0) throw new Error('CSV is empty');
 
@@ -1360,7 +1422,8 @@ function parseCSV(text) {
     parsed.map(row => ({
       label: row[indexCol],
       values: columns.map(col => row[col]),
-    }))
+    })),
+    meta
   );
 }
 
@@ -1372,7 +1435,7 @@ function handleCSVFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const data = parseCSV(e.target.result);
+      const data = parseCSV(e.target.result, { filename: file.name });
       if (data.rowLabels.length < 2) throw new Error(t('alertFewRows'));
       const sampleSel = document.getElementById('sample-select');
       if (sampleSel) sampleSel.value = '';
@@ -1460,6 +1523,9 @@ function setupEventListeners() {
     if (!input) return;
     input.addEventListener('input', () => {
       readAxisTitleInputs();
+      updateEncodingUITexts();
+      updateEncodingSummary();
+      buildLegend();
       refreshAxisLabelsOnly();
     });
   });
@@ -1712,7 +1778,8 @@ function generateOgImage(title, callback) {
 // ===== SECTION 18b: PROJECT HELPERS =====
 function showToast(msg, type, duration) {
   const th = document.querySelector('dataviz-tool-header');
-  if (th && th.showMessage) th.showMessage(msg, type || 'success', duration);
+  const text = typeof msg === 'string' && I18N[msg] ? t(msg) : msg;
+  if (th && th.showMessage) th.showMessage(text, type || 'success', duration);
 }
 
 function getProjectData() {
@@ -1933,7 +2000,10 @@ class SurfaceChartApp extends DvzApp {
     // Template dropzone for CSV upload
     dvzInitFileUpload((parsed) => {
       if (parsed.type === 'csv' || parsed.filename?.endsWith('.csv')) {
-        const data = parseCSV(parsed.raw);
+        const data = parseCSV(parsed.raw, {
+          filename: parsed.filename,
+          sourceName: parsed.filename,
+        });
         currentDataName = parsed.filename?.replace(/\.[^.]+$/, '') || 'Custom';
         updateDataNameDisplay();
         loadData(data);
@@ -1992,7 +2062,11 @@ class SurfaceChartApp extends DvzApp {
     try {
       const res = await fetch(url);
       const text = await res.text();
-      const data = parseCSV(text);
+      const data = parseCSV(text, {
+        name,
+        url,
+        sourceName: name || url,
+      });
       if (options.background && this._shouldSkipAutoSampleLoad()) return;
       currentDataName = name || url.split('/').pop().replace(/\.[^.]+$/, '');
       updateDataNameDisplay();
