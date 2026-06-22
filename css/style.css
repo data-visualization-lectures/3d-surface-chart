@@ -1,0 +1,598 @@
+/* ============================================================
+   Interactive Chart Builder — Tool-specific styles
+   ============================================================ */
+
+/* ── Layout: header offset handled by JS (top set dynamically) ── */
+
+:root {
+  --dvz-control-select-width: 180px;
+  --selector-canvas: #ffffff;
+  --selector-inverse-canvas: #000000;
+  --selector-surface-soft: #f7f7f5;
+  --selector-hairline: #e6e6e6;
+  --selector-hairline-soft: #f1f1f1;
+  --selector-ink: #000000;
+  --selector-inverse-ink: #ffffff;
+  --selector-muted-ink: rgba(0, 0, 0, 0.64);
+  --selector-muted-inverse-ink: rgba(255, 255, 255, 0.74);
+}
+
+.dvz-app {
+  overflow: hidden !important;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+  margin-top: 0 !important;
+}
+
+.dvz-app [hidden] {
+  display: none !important;
+}
+
+.dvz-app[data-dvz-view="selector"] #chart-selector {
+  display: block !important;
+}
+
+.dvz-app[data-dvz-view="selector"] #dvz-chart,
+.dvz-app[data-dvz-view="selector"] #dvz-sidebar {
+  display: none !important;
+}
+
+.dvz-app[data-dvz-view="chart"] #chart-selector {
+  display: none !important;
+}
+
+.dvz-app[data-dvz-view="chart"] #dvz-chart {
+  display: grid !important;
+}
+
+.dvz-app[data-dvz-view="chart"] #dvz-sidebar {
+  display: flex !important;
+}
+
+dataviz-tool-header[hidden],
+body[data-dvz-tool-header="hidden"] dataviz-tool-header {
+  display: none !important;
+}
+
+/* ── Chart Selector ─────────────────────────────────────── */
+
+#chart-selector {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 0 !important;
+  background:
+    radial-gradient(circle at top left, rgba(247, 247, 245, 0.95) 0%, rgba(247, 247, 245, 0.45) 28%, transparent 58%),
+    radial-gradient(circle at top right, rgba(241, 241, 241, 0.85) 0%, rgba(241, 241, 241, 0.15) 26%, transparent 54%),
+    linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+}
+
+.dvz-catalog {
+  width: min(1152px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 40px 0 56px;
+}
+
+.dvz-catalog__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  margin-bottom: 32px;
+}
+
+.dvz-catalog__kicker {
+  margin: 0 0 12px;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dvz-catalog__title {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #111827;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.dvz-catalog__lead {
+  grid-column: 1 / -1;
+  max-width: 680px;
+  margin: 2px 0 0;
+  color: rgba(0, 0, 0, 0.64);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.dvz-catalog__grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.dvz-catalog-card {
+  --dvz-catalog-card-surface: var(--selector-canvas);
+  --dvz-catalog-card-border: var(--selector-hairline);
+  --dvz-catalog-card-ink: var(--selector-ink);
+  --dvz-catalog-card-muted: var(--selector-muted-ink);
+
+  display: block;
+  min-height: 100%;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.18s ease;
+}
+.dvz-catalog-card:hover {
+  transform: translateY(-3px);
+}
+.dvz-catalog-card:active {
+  transform: translateY(0);
+}
+.dvz-catalog-card:focus-visible {
+  outline: none;
+}
+.dvz-catalog-card:focus-visible .dvz-catalog-card__panel {
+  outline: 2px solid var(--dvz-catalog-card-ink);
+  outline-offset: 4px;
+}
+.dvz-catalog-card__panel {
+  display: flex;
+  min-height: 240px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  border: 1px solid var(--dvz-catalog-card-border);
+  border-radius: 24px;
+  background: var(--dvz-catalog-card-surface);
+  padding: 28px;
+  color: var(--dvz-catalog-card-ink);
+  box-shadow: none;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+.dvz-catalog-card:hover .dvz-catalog-card__panel {
+  border-color: var(--dvz-catalog-card-ink);
+}
+.dvz-catalog-card__header,
+.dvz-catalog-card__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.dvz-catalog-card__eyebrow,
+.dvz-catalog-card__meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dvz-catalog-card__eyebrow,
+.dvz-catalog-card__meta {
+  opacity: 0.7;
+}
+.dvz-catalog-card__body {
+  display: flex;
+  flex-direction: column;
+}
+.dvz-catalog-card__thumbnail {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border: 1px solid var(--dvz-catalog-card-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(0, 0, 0, 0.04) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(135deg, transparent 75%, rgba(0, 0, 0, 0.04) 75%) 0 0 / 16px 16px,
+    var(--dvz-catalog-card-surface);
+}
+.dvz-catalog-card__thumbnail-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dvz-catalog-card__title {
+  margin: 0;
+  color: #000000;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+.dvz-catalog-card__description {
+  margin: 12px 0 0;
+  color: var(--dvz-catalog-card-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.dvz-catalog-card__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.88;
+}
+
+.dvz-catalog-card[data-surface="canvas"] {
+  --dvz-catalog-card-surface: var(--selector-canvas);
+  --dvz-catalog-card-border: var(--selector-hairline);
+  --dvz-catalog-card-ink: var(--selector-ink);
+  --dvz-catalog-card-muted: var(--selector-muted-ink);
+}
+
+.dvz-catalog-card[data-surface="soft"] {
+  --dvz-catalog-card-surface: var(--selector-surface-soft);
+  --dvz-catalog-card-border: var(--selector-hairline);
+  --dvz-catalog-card-ink: var(--selector-ink);
+  --dvz-catalog-card-muted: var(--selector-muted-ink);
+}
+
+.dvz-catalog-card[data-surface="soft-alt"] {
+  --dvz-catalog-card-surface: var(--selector-hairline-soft);
+  --dvz-catalog-card-border: var(--selector-hairline);
+  --dvz-catalog-card-ink: var(--selector-ink);
+  --dvz-catalog-card-muted: var(--selector-muted-ink);
+}
+
+.dvz-catalog-card[data-surface="inverse"] {
+  --dvz-catalog-card-surface: var(--selector-inverse-canvas);
+  --dvz-catalog-card-border: var(--selector-inverse-canvas);
+  --dvz-catalog-card-ink: var(--selector-inverse-ink);
+  --dvz-catalog-card-muted: var(--selector-muted-inverse-ink);
+}
+
+@media (min-width: 768px) {
+  .dvz-catalog__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .dvz-catalog__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  #chart-selector {
+    padding: 0 !important;
+  }
+
+  .dvz-catalog {
+    width: min(100% - 40px, 720px);
+    padding: 28px 0 40px;
+  }
+
+  .dvz-catalog__header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dvz-catalog__title {
+    font-size: 2rem;
+  }
+
+  .dvz-catalog-card__panel {
+    min-height: 216px;
+    gap: 22px;
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .dvz-catalog-card__body {
+    max-width: none;
+  }
+}
+
+/* ── Chart Switcher bar ─────────────────────────────────── */
+
+/* Override dvz-common grid to account for #chart-switcher row */
+#dvz-chart {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto !important;
+}
+
+/* Pin each grid child to its intended row explicitly. Otherwise, when
+   #chart-title or #dvz-controls are empty (display:none via :empty),
+   auto-placement shifts #chart-area up into the auto row, causing it
+   to collapse to the SVG's intrinsic content height instead of taking
+   the 1fr fractional row. */
+#dvz-chart > #chart-switcher { grid-row: 1; }
+#dvz-chart > #chart-title    { grid-row: 2; }
+#dvz-chart > #chart-area     { grid-row: 3; }
+#dvz-chart > #dvz-controls   { grid-row: 4; }
+#dvz-chart > #chart-source   { grid-row: 5; }
+
+#chart-switcher {
+  flex-shrink: 0;
+}
+
+#chart-back-btn {
+  transition: color 0.15s;
+}
+
+/* ── SVG template (dvz-template-svg) ────────────────────── */
+/* Shared styles for all SVG-based charts.                  */
+/* Applied when templateType='svg' in chart-registry.       */
+
+.dvz-template-svg {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.dvz-template-svg svg { width: 100%; height: auto; display: block; }
+
+/* ── Empty state ────────────────────────────────────────── */
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 400px;
+  color: #999; font-size: 15px; gap: 12px;
+}
+.empty-state .icon { font-size: 48px; opacity: 0.4; }
+
+/* ── Streamgraph styles ─────────────────────────────────── */
+
+.stream-layer {
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+.dimmed .stream-layer { opacity: 0.15; }
+.dimmed .stream-layer.highlighted { opacity: 1; }
+
+.x-axis path, .x-axis line,
+.y-axis path, .y-axis line,
+.axis path, .axis line {
+  stroke: #d5dce6;
+  shape-rendering: crispEdges;
+}
+
+.x-axis .tick line,
+.y-axis .tick line,
+.axis .tick line {
+  stroke: #e7edf4;
+}
+
+.x-axis text,
+.y-axis text,
+.axis text {
+  fill: #99a3b2;
+  font-size: 10px;
+  font-family: sans-serif;
+}
+
+.stream-tooltip {
+  position: absolute; pointer-events: none;
+  background: rgba(40,40,40,0.94); color: #fff;
+  padding: 8px 12px; border-radius: 6px;
+  font-size: 12px; line-height: 1.5;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+  z-index: 100; white-space: nowrap;
+  opacity: 0; transition: opacity 0.12s ease;
+}
+.stream-tooltip .tooltip-swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px; margin-right: 6px; vertical-align: middle;
+}
+
+/* ── Bump Chart styles ──────────────────────────────────── */
+
+.chart-container {
+  background: #fff; border-radius: 8px; padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.chart-container svg { width: 100%; height: auto; display: block; }
+
+.bump-line { fill: none; transition: opacity 0.2s, stroke-width 0.2s; cursor: pointer; }
+.bump-circle { stroke: #fff; stroke-width: 2; transition: opacity 0.2s; cursor: pointer; }
+.bump-label { font-size: 12px; font-weight: 600; transition: opacity 0.2s; }
+.axis-label { font-size: 12px; fill: #8e99ab; }
+.rank-label { font-size: 11px; fill: #97a2b2; }
+.grid-line { stroke: #e7edf4; stroke-width: 1; }
+
+.dimmed .bump-line, .dimmed .bump-circle, .dimmed .bump-label { opacity: 0.1; }
+.dimmed .bump-line.highlighted, .dimmed .bump-circle.highlighted, .dimmed .bump-label.highlighted { opacity: 1; }
+.dimmed .bump-line.highlighted { stroke-width: 4; }
+
+.bump-tooltip {
+  position: fixed; pointer-events: none;
+  background: rgba(0,0,0,0.8); color: #fff;
+  padding: 6px 10px; border-radius: 4px;
+  font-size: 0.75rem; line-height: 1.4;
+  white-space: nowrap; opacity: 0;
+  transition: opacity 0.15s; z-index: 100;
+}
+.bump-tooltip.visible { opacity: 1; }
+
+/* ── Bee Swarm Plot styles ──────────────────────────────── */
+
+circle.dot { transition: opacity 0.15s ease; }
+.legend-group text { user-select: none; }
+
+.bee-tooltip {
+  position: absolute; pointer-events: none;
+  background: rgba(40,40,40,0.94); color: #fff;
+  padding: 8px 12px; border-radius: 6px;
+  font-size: 12px; line-height: 1.5;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+  z-index: 100; max-width: 260px; white-space: nowrap;
+  opacity: 0; transition: opacity 0.12s ease;
+}
+.bee-tooltip .tooltip-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.bee-tooltip .tooltip-row { display: flex; gap: 6px; }
+.bee-tooltip .tooltip-key { color: #aaa; }
+
+/* ── Venn / Euler Diagram styles ─────────────────────────── */
+
+.venn-circle path {
+  fill-opacity: 0.55; stroke-width: 2; stroke: #fff;
+  transition: fill-opacity 0.2s ease;
+}
+.venn-circle text { font-size: 15px; font-weight: 700; fill: #333; pointer-events: none; }
+.venn-intersection text { pointer-events: none; }
+.venn-intersection path { fill-opacity: 0; stroke: none; transition: fill-opacity 0.2s ease; }
+
+/* ── Timeseries Scatterplot styles ──────────────────────── */
+
+#chartBlock svg { width: 100%; height: auto; }
+.year-ticker {
+  font-size: 64px; font-weight: 800; fill: #e8e8ed;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+
+/* ── Circle Packing styles ──────────────────────────────── */
+
+.group-label { font-size: 0.88rem; font-weight: 700; fill: #4a4232; text-anchor: middle; }
+.group-label tspan:last-child { font-weight: 500; fill: #6d634f; }
+.node { cursor: pointer; transition: opacity 150ms ease; }
+.node.is-faded { opacity: 0.2; }
+.node-value-label {
+  fill: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(31, 41, 55, 0.35);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.node-value-label.is-faded { opacity: 0.2; }
+
+.control-chip-group {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px; border-radius: 999px; background: #d1d5db;
+}
+.control-chip {
+  border: 1px solid transparent; background: transparent; color: #4b5563;
+  padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.78rem;
+  line-height: 1; white-space: nowrap; cursor: pointer; transition: 180ms ease;
+}
+.control-chip:hover { color: #1f2937; }
+.control-chip.is-active {
+  background: #fff; color: #111827; border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.cp-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cp-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: #374151;
+}
+
+.summary-grid { display: inline-flex; align-items: center; gap: 14px; }
+.summary-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: none; border-radius: 0;
+  padding: 0; white-space: nowrap;
+}
+.summary-item .label { color: #6f6654; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.summary-item .value { font-size: 0.9rem; line-height: 1; font-weight: 700; }
+
+/* Circle packing controls row: spread toggle (left) and summary (right) */
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  width: 100%;
+}
+.cp-row .summary-grid {
+  margin-left: auto;
+}
+
+.side-chip {
+  border: 1px solid #d1d5db; background: #fff; color: #374151;
+  padding: 7px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+}
+.side-chip.is-active { border-color: #4f81bd; color: #1d4e89; background: #eff6ff; }
+
+/* ── WebGL template (dvz-template-webgl) ────────────────── */
+/* Shared styles for all WebGL/canvas-based charts.         */
+/* Applied when templateType='webgl' in chart-registry.     */
+
+.dvz-template-webgl {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.dvz-template-webgl canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.dvz-template-webgl .axis-label {
+  position: absolute;
+  font-size: 0.7rem;
+  color: #666;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+.dvz-template-webgl .axis-label.vertical {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.6rem;
+}
+.dvz-template-webgl .axis-label.title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.view-btn { transition: all 0.15s; }
+.view-btn.active {
+  background: #333 !important; color: #fff !important; border-color: #333 !important;
+}
+
+.dvz-template-webgl.dragover { outline: 3px dashed #6a6; outline-offset: -3px; }
+
+.dvz-template-webgl #drop-overlay {
+  display: none; position: absolute; inset: 0; background: rgba(106,170,106,0.15);
+  z-index: 50; pointer-events: none; align-items: center; justify-content: center;
+  font-size: 1.2rem; color: #363; font-weight: 600;
+}
+.dvz-template-webgl.dragover #drop-overlay { display: flex; }
+
+.dvz-template-webgl #legend {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.8rem; color: #666;
+}
+.dvz-template-webgl #legend canvas { border-radius: 3px; border: 1px solid #ddd; }
+.dvz-template-webgl #legend .legend-label { min-width: 30px; }
+.dvz-template-webgl #data-info { font-size: 0.75rem; color: #999; margin-top: 8px; }
+
+/* ── Embed mode ─────────────────────────────────────────── */
+
+.dvz-embed #chart-selector { display: none !important; }
+.dvz-embed #chart-switcher { display: none !important; }

@@ -1,175 +1,243 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3D Surface Chart</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Surface Chart</title>
 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-61Z8R0850T"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  <!-- dataviz.jp shared libs (embed時はスキップ) -->
+  <script>
+  (function () {
+    if (new URLSearchParams(location.search).get('embed') === '1') return;
 
-  gtag('config', 'G-61Z8R0850T');
-</script>
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Failed to load: ' + src));
+        document.head.appendChild(s);
+      });
+    }
 
-<link rel="stylesheet" href="style.css">
+    (async () => {
+      try {
+        await loadScript('https://app.dataviz.jp/lib/supabase.js');
+        await loadScript('https://app.dataviz.jp/lib/dataviz-auth-client.js');
+        await loadScript('https://id.data-viz-lectures.com/lib/dataviz-tool-header.js');
+      } catch (err) {
+        console.error('[3d-surface-chart] shared libs load failed:', err);
+      }
+    })();
+  })();
+  </script>
 
-<!-- D3.js v7 -->
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-
-<!-- Three.js import map -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  <!-- Import map for Three.js (3D Surface Chart — loaded on demand) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
   }
-}
-</script>
-<!-- 1. Supabase クライアント -->
-<script src="https://app.dataviz.jp/lib/supabase.js"></script>
+  </script>
 
-<!-- 2. 共通ヘッダー + 認証ロジック -->
-<script src="https://app.dataviz.jp/lib/dataviz-auth-client.js"></script>
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- 3. ツールヘッダー -->
-<script src="https://app.dataviz.jp/lib/dataviz-tool-header.js" defer></script>
+  <!-- Styles -->
+  <script>
+  (function () {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://app.dataviz.jp/lib/dvz-editor-shell.v1.css';
+    link.onerror = () => {
+      const fallback = document.createElement('link');
+      fallback.rel = 'stylesheet';
+      fallback.href = 'css/dvz-common.css';
+      document.head.appendChild(fallback);
+    };
+    document.head.appendChild(link);
+  })();
+  </script>
+  <noscript><link rel="stylesheet" href="css/dvz-common.css"></noscript>
+  <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="bg-gray-50 text-gray-800 antialiased">
 
-<dataviz-tool-header></dataviz-tool-header>
+  <dataviz-tool-header></dataviz-tool-header>
 
-<!-- ==================== HTML STRUCTURE ==================== -->
-<div id="app">
+  <div class="dvz-app flex" data-dvz-view="selector">
 
-  <div id="controls">
-    <!-- Data controls -->
-    <select id="sample-select" style="display:none">
-      <optgroup id="mof-optgroup" label="">
-        <option value="mof-recent5" data-i18n="recent5"></option>
-        <option value="mof-recent10" data-i18n="recent10"></option>
-        <option value="mof-2020s" data-i18n="decade2020"></option>
-        <option value="mof-2010s" data-i18n="decade2010"></option>
-        <option value="mof-2000s" data-i18n="decade2000"></option>
-        <option value="mof-1990s" data-i18n="decade1990"></option>
-        <option value="mof-1980s" data-i18n="decade1980"></option>
-        <option value="mof-all" data-i18n="allPeriod"></option>
-      </optgroup>
-      <option value="us" data-i18n="usTreasury"></option>
-      <option value="births" data-i18n="numberOfBirths"></option>
-    </select>
-    <span id="data-name" style="font-size: 0.85rem; color: #ccc; margin-right: 8px;"></span>
-    <button id="csv-btn" data-i18n="loadCsv"></button>
-    <input type="file" id="csv-input" accept=".csv" style="display:none">
+    <!-- ====================================================== -->
+    <!-- Main area                                               -->
+    <!-- ====================================================== -->
+    <div id="main-area" class="flex flex-1 flex-col overflow-y-auto bg-white">
 
-    <div class="separator"></div>
+      <!-- Chart Selector (initial screen) -->
+      <div id="chart-selector" class="flex flex-1 justify-center px-6 py-10 sm:px-8 lg:px-10">
+        <main class="dvz-catalog" aria-labelledby="dvz-catalog-title">
+          <header class="dvz-catalog__header">
+            <p class="dvz-catalog__kicker">3D Chart Tool</p>
+            <h1 id="dvz-catalog-title" class="dvz-catalog__title">3D Surface Chart</h1>
+            <p class="dvz-catalog__lead">CSV データを 3D 曲面として可視化します。</p>
+          </header>
+          <div id="chart-selector-grid" class="dvz-catalog__grid">
+            <!-- Cards injected by interactive-chart-builder.js -->
+          </div>
+        </main>
+      </div>
 
-    <!-- Color scheme -->
-    <select id="color-select">
-      <optgroup id="seq-optgroup" label="">
-        <option value="YlOrRd" selected>YlOrRd</option>
-        <option value="YlGnBu">YlGnBu</option>
-        <option value="Viridis">Viridis</option>
-        <option value="Inferno">Inferno</option>
-        <option value="Plasma">Plasma</option>
-        <option value="Cividis">Cividis</option>
-        <option value="Turbo">Turbo</option>
-        <option value="Blues">Blues</option>
-        <option value="Greens">Greens</option>
-        <option value="Oranges">Oranges</option>
-        <option value="Reds">Reds</option>
-        <option value="Purples">Purples</option>
-      </optgroup>
-      <optgroup id="div-optgroup" label="">
-        <option value="RdBu">RdBu</option>
-        <option value="RdYlBu">RdYlBu</option>
-        <option value="RdYlGn">RdYlGn</option>
-        <option value="Spectral">Spectral</option>
-        <option value="BrBG">BrBG</option>
-        <option value="PRGn">PRGn</option>
-        <option value="PiYG">PiYG</option>
-        <option value="PuOr">PuOr</option>
-        <option value="RdGy">RdGy</option>
-      </optgroup>
-    </select>
-    <label id="zero-center-label" style="display:none; font-size:0.8rem; cursor:pointer;">
-      <input type="checkbox" id="zero-center"> <span data-i18n="zeroBasis"></span>
-    </label>
+      <!-- Chart view (hidden until template selected) -->
+      <main id="dvz-chart" class="relative flex flex-1 flex-col px-4 py-3" hidden aria-hidden="true">
+        <!-- Back to selector -->
+        <div id="chart-switcher" class="mb-2 flex items-center gap-2">
+          <button id="chart-back-btn" type="button" class="text-sm text-gray-500 hover:text-gray-700">&larr; 一覧</button>
+          <span id="chart-type-name" class="text-sm font-normal text-black empty:hidden"></span>
+        </div>
+        <h1 id="chart-title" class="mb-1 self-start text-lg font-semibold text-gray-900 empty:hidden"></h1>
+        <div id="chart-area" class="relative flex flex-1 items-center justify-center">
+          <div id="chart-container" class="w-full">
+            <div class="empty-state">
+              <div style="font-size:48px; opacity:0.4;">📊</div>
+              <div data-i18n="emptyState">CSV をアップロード、または「サンプル」ボタンを押してください</div>
+            </div>
+          </div>
+        </div>
+        <div id="dvz-controls" class="mt-3 empty:hidden"></div>
+        <div id="chart-source" class="mt-2 self-start text-xs text-gray-400 empty:hidden"></div>
+      </main>
 
-    <div class="separator"></div>
-
-    <!-- Label orientation -->
-    <select id="label-orient">
-      <option value="horizontal" data-i18n="labelHorizontal"></option>
-      <option value="vertical" data-i18n="labelVertical"></option>
-    </select>
-
-    <div class="separator"></div>
-
-    <!-- Camera presets -->
-    <button class="view-btn active" data-view="overview" data-i18n="viewOverview"></button>
-    <button class="view-btn" data-view="front" data-i18n="viewFront"></button>
-    <button class="view-btn" data-view="top" data-i18n="viewTop"></button>
-    <button class="view-btn" data-view="side" data-i18n="viewSide"></button>
-
-    <div class="separator"></div>
-
-    <span class="controls-hint" data-i18n="shareHint"></span>
-  </div>
-
-  <div id="chart-container">
-    <div id="drop-overlay" data-i18n="dropCsv"></div>
-  </div>
-
-  <div id="legend">
-    <span class="legend-label" id="legend-min"></span>
-    <canvas id="legend-canvas" width="250" height="16"></canvas>
-    <span class="legend-label" id="legend-max"></span>
-    <span style="margin-left:8px" data-i18n="axisValue"></span>
-  </div>
-
-  <div id="data-info"></div>
-
-  <div class="share-section">
-    <button id="share-btn" data-i18n="shareChart"></button>
-  </div>
-
-  <div class="site-links">
-    <a href="https://www.dataviz.jp/3d-surface-chart/">3D Surface Chart</a>
-    <span>|</span>
-    <a href="https://www.dataviz.jp/">データの道具箱</a>
-  </div>
-</div>
-
-<!-- タイトル入力モーダル -->
-<div class="dvz-modal-overlay" id="dvz-title-modal">
-  <div class="dvz-modal-inner">
-    <h3 id="dvz-title-modal-heading"></h3>
-    <input type="text" id="dvz-title-input">
-    <div class="dvz-modal-actions" style="justify-content:flex-end">
-      <button id="dvz-title-cancel"></button>
-      <button id="dvz-title-ok" class="dvz-btn-primary">OK</button>
+      <!-- Site links -->
+      <div id="dvz-site-links" class="dvz-site-links py-3 text-center text-xs text-gray-400">
+        <a href="https://www.dataviz.jp/" target="_blank" rel="noopener" class="hover:text-gray-600">dataviz.jp</a>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- シェアURLモーダル -->
-<div class="dvz-modal-overlay" id="dvz-share-modal">
-  <div class="dvz-modal-inner">
-    <h3 id="dvz-share-heading"></h3>
-    <p id="dvz-share-desc" style="font-size:0.9rem;color:#666;margin-bottom:12px"></p>
-    <input type="text" id="dvz-share-url" readonly style="background:#f8f8f8;cursor:text">
-    <div class="dvz-modal-actions">
-      <button id="dvz-share-copy" class="dvz-btn-primary"></button>
-      <button id="dvz-share-x" class="dvz-btn-dark"></button>
-      <button id="dvz-share-close"></button>
-    </div>
-  </div>
-</div>
+    <!-- ====================================================== -->
+    <!-- Right sidebar (hidden until template selected)          -->
+    <!-- ====================================================== -->
+    <aside id="dvz-sidebar" class="dvz-sidebar flex w-96 shrink-0 flex-col overflow-x-hidden border-l border-gray-200 bg-white" hidden aria-hidden="true">
 
-<script type="module" src="main.js"></script>
+      <!-- Tabs -->
+      <div class="border-b border-gray-200">
+        <div class="grid grid-cols-1 sm:hidden px-5 pt-4 pb-3">
+          <select id="sidebar-tab-select" aria-label="Select a tab" class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600">
+            <option value="tab-data" selected data-i18n="tabData">Data</option>
+            <option value="tab-mapping" data-i18n="tabMapping">Mapping</option>
+            <option value="tab-style" data-i18n="tabStyle">Style</option>
+            <option value="tab-annotate" data-i18n="tabAnnotate">Annotate</option>
+            <option value="tab-export" data-i18n="tabExport">Export</option>
+          </select>
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end fill-gray-500"><path d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd"/></svg>
+        </div>
+        <nav class="hidden sm:flex" aria-label="Tabs">
+          <button type="button" data-tab="tab-data" data-i18n="tabData" class="sidebar-tab flex-1 border-b-2 border-indigo-500 px-4 py-3 text-center text-sm font-medium text-indigo-600">Data</button>
+          <button type="button" data-tab="tab-mapping" data-i18n="tabMapping" class="sidebar-tab flex-1 border-b-2 border-transparent px-4 py-3 text-center text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Mapping</button>
+          <button type="button" data-tab="tab-style" data-i18n="tabStyle" class="sidebar-tab flex-1 border-b-2 border-transparent px-4 py-3 text-center text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Style</button>
+          <button type="button" data-tab="tab-annotate" data-i18n="tabAnnotate" class="sidebar-tab flex-1 border-b-2 border-transparent px-4 py-3 text-center text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Annotate</button>
+          <button type="button" data-tab="tab-export" data-i18n="tabExport" class="sidebar-tab flex-1 border-b-2 border-transparent px-4 py-3 text-center text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Export</button>
+        </nav>
+      </div>
+
+      <!-- Tab panels -->
+      <div class="flex flex-1 flex-col overflow-hidden">
+
+        <!-- Data tab (content injected by module) -->
+        <div id="tab-data" class="sidebar-panel flex flex-1 flex-col overflow-hidden">
+          <div class="flex-1 overflow-y-auto">
+            <!-- Module-specific data panel content injected here -->
+          </div>
+        </div>
+
+        <!-- Mapping tab (content injected by module) -->
+        <div id="tab-mapping" class="sidebar-panel hidden flex-1 overflow-y-auto">
+          <!-- Module-specific mapping panel content injected here -->
+        </div>
+
+        <!-- Style tab (content injected by module) -->
+        <div id="tab-style" class="sidebar-panel hidden flex-1 overflow-y-auto">
+          <!-- Module-specific style panel content injected here -->
+        </div>
+
+        <!-- Annotate tab (shared across all charts) -->
+        <div id="tab-annotate" class="sidebar-panel hidden flex-1 flex-col overflow-hidden">
+          <div class="flex-1 overflow-y-auto">
+            <section class="border-b border-gray-100 px-5 py-4">
+              <label for="annotate-title" class="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="annotateTitle">Title</label>
+              <input type="text" id="annotate-title" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none" data-i18n="annotateTitlePlaceholder" placeholder="Chart title">
+            </section>
+            <section class="border-b border-gray-100 px-5 py-4">
+              <label for="annotate-source" class="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="annotateSource">Source</label>
+              <input type="text" id="annotate-source" class="mb-3 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none" data-i18n="annotateSourcePlaceholder" placeholder="Data source name">
+              <label for="annotate-source-url" class="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="annotateSourceUrl">Source URL</label>
+              <input type="url" id="annotate-source-url" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none" placeholder="https://...">
+            </section>
+            <section class="px-5 py-4">
+              <label for="legend-position" class="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="annotateLegend">Legend</label>
+              <select id="legend-position" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none">
+                <option value="none" data-i18n="legendNone">None</option>
+                <option value="top-right" selected data-i18n="legendTopRight">Top Right</option>
+                <option value="bottom-right" data-i18n="legendBottomRight">Bottom Right</option>
+              </select>
+            </section>
+          </div>
+          <div class="shrink-0 border-t border-gray-200 px-5 py-4">
+            <button id="annotate-apply-btn" class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700" data-i18n="apply">Apply</button>
+          </div>
+        </div>
+
+        <!-- Export tab (shared across all charts) -->
+        <div id="tab-export" class="sidebar-panel hidden flex-1 overflow-y-auto">
+          <section class="px-5 py-4">
+            <h3 class="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="exportImage">Image</h3>
+            <div class="flex flex-col gap-3">
+              <button id="export-svg-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                SVG
+              </button>
+              <button id="export-png-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                PNG (2x)
+              </button>
+            </div>
+          </section>
+          <section class="border-t border-gray-100 px-5 py-4">
+            <h3 class="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="exportData">Data</h3>
+            <div class="flex flex-col gap-3">
+              <button id="export-csv-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+              </button>
+              <button id="export-json-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                JSON
+              </button>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Tooltip -->
+  <div id="tooltip" class="dvz-tooltip" style="display:none;"></div>
+
+  <!-- Chart-specific tooltip containers -->
+  <div id="bump-tooltip" class="bump-tooltip"></div>
+
+  <script src="https://app.dataviz.jp/lib/dvz-editor-shell.v1.js"></script>
+  <script src="js/dvz-common.js"></script>
+  <script src="https://app.dataviz.jp/lib/settings-compat.js"></script>
+  <script src="js/chart-registry.js"></script>
+  <script src="js/core/routing.js"></script>
+  <script src="js/core/renderer-adapters.js"></script>
+  <script src="js/core/share-service.js"></script>
+  <script src="js/core/header-manager.js"></script>
+  <script src="js/core/runtime.js"></script>
+  <script src="js/interactive-chart-builder.js"></script>
 </body>
 </html>
