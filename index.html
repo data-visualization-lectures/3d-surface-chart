@@ -68,7 +68,7 @@
 
   <dataviz-tool-header></dataviz-tool-header>
 
-  <div class="dvz-app flex" data-dvz-view="selector">
+  <div class="dvz-app flex" data-dvz-view="chart">
 
     <!-- ====================================================== -->
     <!-- Main area                                               -->
@@ -76,7 +76,7 @@
     <div id="main-area" class="flex flex-1 flex-col overflow-y-auto bg-white">
 
       <!-- Chart Selector (initial screen) -->
-      <div id="chart-selector" class="flex flex-1 justify-center px-6 py-10 sm:px-8 lg:px-10">
+      <div id="chart-selector" class="flex flex-1 justify-center px-6 py-10 sm:px-8 lg:px-10" hidden aria-hidden="true">
         <main class="dvz-catalog" aria-labelledby="dvz-catalog-title">
           <header class="dvz-catalog__header">
             <p class="dvz-catalog__kicker">3D Chart Tool</p>
@@ -90,9 +90,9 @@
       </div>
 
       <!-- Chart view (hidden until template selected) -->
-      <main id="dvz-chart" class="relative flex flex-1 flex-col px-4 py-3" hidden aria-hidden="true">
-        <!-- Back to selector -->
-        <div id="chart-switcher" class="mb-2 flex items-center gap-2">
+      <main id="dvz-chart" class="relative flex flex-1 flex-col px-4 py-3" aria-hidden="false">
+        <!-- Legacy selector switcher kept for compatibility, hidden in single-chart mode. -->
+        <div id="chart-switcher" class="mb-2 flex items-center gap-2" hidden aria-hidden="true">
           <button id="chart-back-btn" type="button" class="text-sm text-gray-500 hover:text-gray-700">&larr; 一覧</button>
           <span id="chart-type-name" class="text-sm font-normal text-black empty:hidden"></span>
         </div>
@@ -118,7 +118,7 @@
     <!-- ====================================================== -->
     <!-- Right sidebar (hidden until template selected)          -->
     <!-- ====================================================== -->
-    <aside id="dvz-sidebar" class="dvz-sidebar flex w-96 shrink-0 flex-col overflow-x-hidden border-l border-gray-200 bg-white" hidden aria-hidden="true">
+    <aside id="dvz-sidebar" class="dvz-sidebar flex w-96 shrink-0 flex-col overflow-x-hidden border-l border-gray-200 bg-white" aria-hidden="false">
 
       <!-- Tabs -->
       <div class="border-b border-gray-200">

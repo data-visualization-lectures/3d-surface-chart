@@ -5,6 +5,8 @@
 (function () {
   'use strict';
 
+  const DEFAULT_CHART_ID = '3d-surface-chart';
+
   function currentLang() {
     return (navigator.language || '').startsWith('ja') ? 'ja' : 'en';
   }
@@ -94,7 +96,8 @@
 
     return {
       ok: true,
-      mode: 'selector',
+      mode: 'chart',
+      chartId: DEFAULT_CHART_ID,
     };
   }
 
