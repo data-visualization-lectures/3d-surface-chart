@@ -81,7 +81,7 @@
           }
 
           const params = new URLSearchParams(location.search);
-          const hasProjectRoute = !!(params.get('projectId') || params.get('project_id'));
+          const hasProjectRoute = !!params.get('projectId');
           const dataUrl = params.get('data_url');
           if (dataUrl && !hasProjectRoute && hasFn(this, '_safeLoadSampleData')) {
             return this._safeLoadSampleData(

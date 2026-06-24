@@ -65,8 +65,15 @@
       };
     }
 
-    // Backward-compatible: accept both `projectId` and legacy `project_id`.
-    const projectId = clean(params.get('projectId')) || clean(params.get('project_id'));
+    if (params.has('project_id')) {
+      return {
+        ok: false,
+        code: 'legacy_project_id',
+        message: msg('indexLegacyProjectId'),
+      };
+    }
+
+    const projectId = clean(params.get('projectId'));
     const chartId = clean(params.get('chart'));
 
     if (projectId) {

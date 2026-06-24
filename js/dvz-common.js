@@ -775,7 +775,7 @@ class DvzApp {
 
   _hasProjectRouteParam() {
     const params = new URLSearchParams(location.search);
-    return !!(params.get('projectId') || params.get('project_id'));
+    return !!params.get('projectId');
   }
 
   _shouldSkipAutoSampleLoad() {
@@ -1364,7 +1364,7 @@ class DvzApp {
 
     // Auto-load from URL param
     const params = new URLSearchParams(location.search);
-    const projectId = params.get('projectId') || params.get('project_id');
+    const projectId = params.get('projectId');
     if (projectId && header.loadProject) {
       header.loadProject(projectId);
     }
