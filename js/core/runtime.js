@@ -383,7 +383,6 @@
         const thumbnail = entry.thumbnail || `images/catalog/${entry.id}.png`;
         const hrefParams = new URLSearchParams(location.search);
         hrefParams.delete('projectId');
-        hrefParams.delete('project_id');
         hrefParams.set('chart', entry.id);
 
         card.href = `${location.pathname}?${hrefParams.toString()}${location.hash}`;

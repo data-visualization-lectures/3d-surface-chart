@@ -14,10 +14,6 @@
   function msg(key) {
     const lang = currentLang();
     const dict = {
-      indexLegacyProjectId: {
-        ja: '旧URLパラメータ `project_id` は非対応です。`?projectId=` を使用してください。',
-        en: 'Legacy URL parameter `project_id` is not supported. Use `?projectId=` instead.',
-      },
       indexShareIdInEditor: {
         ja: '共有URLは `share.html?id=...` を使用してください。',
         en: 'Use `share.html?id=...` for shared chart URLs.',
@@ -67,13 +63,6 @@
       };
     }
 
-    if (params.has('project_id')) {
-      return {
-        ok: false,
-        code: 'legacy_project_id',
-        message: msg('indexLegacyProjectId'),
-      };
-    }
 
     const projectId = clean(params.get('projectId'));
     const chartId = clean(params.get('chart'));
@@ -104,7 +93,7 @@
   function parseShareRoute(search) {
     const params = new URLSearchParams(search || location.search || '');
 
-    if (params.has('project_id') || params.has('projectId') || params.has('shareId')) {
+    if (params.has('projectId') || params.has('shareId')) {
       return {
         ok: false,
         code: 'legacy_share_route',
