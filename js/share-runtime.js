@@ -39,6 +39,16 @@
     contentDisplay: 'flex',
   });
 
+  function pickAnnotationValue(...values) {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    for (const value of values) {
+      if (typeof value === 'string') return value;
+    }
+    return null;
+  }
+
   function ensureShareSidebarProxy(meta) {
     shareShell.ensureSidebarProxy({
       meta,
@@ -101,11 +111,13 @@
   }
 
   function renderSource(sourceEl, config) {
-    const source = String(config.annotateSource || '').trim();
+    const source = String(pickAnnotationValue(config?.annotateSource, config?.settings?.annotateSource) || '').trim();
     if (!source) return;
 
     const prefix = LANG === 'ja' ? '出典: ' : 'Source: ';
-    const sourceUrl = normalizeExternalUrl(config.annotateSourceUrl);
+    const sourceUrl = normalizeExternalUrl(
+      pickAnnotationValue(config?.annotateSourceUrl, config?.settings?.annotateSourceUrl)
+    );
     sourceEl.textContent = '';
     sourceEl.appendChild(document.createTextNode(prefix));
 
@@ -162,9 +174,7 @@
       const entry = CHART_REGISTRY.find((chart) => chart.id === chartType);
       if (!entry) throw new Error(LANG === 'ja' ? '不明なチャートタイプです' : 'Unknown chart type');
 
-      const annotateTitle = (typeof config?.annotateTitle === 'string')
-        ? config.annotateTitle
-        : ((typeof config?.settings?.annotateTitle === 'string') ? config.settings.annotateTitle : null);
+      const annotateTitle = pickAnnotationValue(config?.annotateTitle, config?.settings?.annotateTitle);
       const defaultChartTitles = [...new Set([
         entry?.name?.[LANG],
         entry?.name?.ja,

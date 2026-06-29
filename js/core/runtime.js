@@ -30,6 +30,16 @@
     };
   }
 
+  function pickAnnotationValue(...values) {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    for (const value of values) {
+      if (typeof value === 'string') return value;
+    }
+    return '';
+  }
+
   class BuilderRuntime {
     constructor(config = {}) {
       this.config = { ...DEFAULT_CONFIG, ...config };
@@ -218,11 +228,33 @@
       return chartData;
     }
 
-    restoreAnnotationStateFromChartData(chartData) {
-      const title = chartData?.annotateTitle ?? chartData?.settings?.annotateTitle ?? '';
-      const source = chartData?.annotateSource ?? chartData?.settings?.annotateSource ?? '';
-      const sourceUrl = chartData?.annotateSourceUrl ?? chartData?.settings?.annotateSourceUrl ?? '';
-      const legendPosition = chartData?.legendPosition ?? chartData?.settings?.legendPosition ?? null;
+    restoreAnnotationStateFromChartData(chartData, fallbackData = {}) {
+      const settings = chartData?.settings && typeof chartData.settings === 'object' ? chartData.settings : {};
+      const fallbackSettings = fallbackData?.settings && typeof fallbackData.settings === 'object' ? fallbackData.settings : {};
+      const title = pickAnnotationValue(
+        chartData?.annotateTitle,
+        settings.annotateTitle,
+        fallbackData?.annotateTitle,
+        fallbackSettings.annotateTitle
+      );
+      const source = pickAnnotationValue(
+        chartData?.annotateSource,
+        settings.annotateSource,
+        fallbackData?.annotateSource,
+        fallbackSettings.annotateSource
+      );
+      const sourceUrl = pickAnnotationValue(
+        chartData?.annotateSourceUrl,
+        settings.annotateSourceUrl,
+        fallbackData?.annotateSourceUrl,
+        fallbackSettings.annotateSourceUrl
+      );
+      const legendPosition = pickAnnotationValue(
+        chartData?.legendPosition,
+        settings.legendPosition,
+        fallbackData?.legendPosition,
+        fallbackSettings.legendPosition
+      ) || null;
 
       const annotateTitle = document.getElementById('annotate-title');
       const annotateSource = document.getElementById('annotate-source');
@@ -676,7 +708,7 @@
         this.state.currentInstance._hasLoadedProject = true;
       }
       this.state.currentInstance?._loadProjectData?.(chartData);
-      this.restoreAnnotationStateFromChartData(chartData);
+      this.restoreAnnotationStateFromChartData(chartData, projectData);
       this.updateProjectSnapshot(projectData);
     }
 
