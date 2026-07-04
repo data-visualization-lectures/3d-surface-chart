@@ -810,6 +810,132 @@ class DvzApp {
     }
   }
 
+  _getSampleLocale() {
+    const resolved = window.DatavizLocale?.resolve?.()
+      || (typeof window.dvzResolveLocale === 'function' ? window.dvzResolveLocale() : null)
+      || DVZ_LANG
+      || 'ja';
+    return resolved === 'en' ? 'en' : 'ja';
+  }
+
+  _pickSampleLocaleValue(record, jaKey, enKey) {
+    const locale = this._getSampleLocale();
+    const jaValue = record && record[jaKey];
+    const enValue = record && record[enKey];
+    return locale === 'en'
+      ? (enValue || jaValue || '')
+      : (jaValue || enValue || '');
+  }
+
+  _sampleAnnotationFromCatalogEntry(entry, variant = null) {
+    if (!entry) return null;
+    const catalogName = this._pickSampleLocaleValue(entry, 'name', 'nameEn');
+    const variantLabel = variant ? this._pickSampleLocaleValue(variant, 'label', 'labelEn') : '';
+    return {
+      title: [catalogName, variantLabel].filter(Boolean).join(' - '),
+      source: this._pickSampleLocaleValue(entry, 'source', 'sourceEn'),
+      sourceUrl: (variant && variant.sourceUrl) || entry.sourceUrl || '',
+    };
+  }
+
+  _sampleAnnotationFromDetail(detail = {}, fallbackName = '') {
+    if (!detail || typeof detail !== 'object') detail = {};
+    const title = this._pickSampleLocaleValue(
+      {
+        title: detail.annotationTitle || detail.catalogName || detail.name || fallbackName,
+        titleEn: detail.annotationTitleEn || detail.catalogNameEn || detail.nameEn || detail.annotationTitle || detail.catalogName || fallbackName,
+      },
+      'title',
+      'titleEn'
+    );
+    return {
+      title,
+      source: this._pickSampleLocaleValue(detail, 'source', 'sourceEn'),
+      sourceUrl: detail.sourceUrl || '',
+    };
+  }
+
+  _sampleCatalogBaseUrl() {
+    return window.datavizAuthUrl || 'https://app.dataviz.jp';
+  }
+
+  _normalizeSampleUrlForCompare(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    try {
+      const base = raw.startsWith('/') ? this._sampleCatalogBaseUrl() : window.location.href;
+      const parsed = new URL(raw, base);
+      return {
+        href: parsed.href,
+        path: `${parsed.pathname}${parsed.search}`,
+      };
+    } catch (_) {
+      return { href: raw, path: raw };
+    }
+  }
+
+  _sampleUrlsMatch(left, right) {
+    const a = this._normalizeSampleUrlForCompare(left);
+    const b = this._normalizeSampleUrlForCompare(right);
+    if (!a || !b) return false;
+    return a.href === b.href || a.path === b.path;
+  }
+
+  async _sampleAnnotationFromCatalogUrl(url) {
+    if (!url) return null;
+    try {
+      if (!DvzApp.__sampleCatalogPromise) {
+        DvzApp.__sampleCatalogPromise = fetch(`${this._sampleCatalogBaseUrl()}/catalog.json`)
+          .then((res) => (res.ok ? res.json() : null))
+          .catch(() => null);
+      }
+      const catalog = await DvzApp.__sampleCatalogPromise;
+      const entries = catalog?.entries || [];
+      for (const entry of entries) {
+        if (this._sampleUrlsMatch(entry.fileUrl, url) || this._sampleUrlsMatch(entry.fileUrlEn, url)) {
+          return this._sampleAnnotationFromCatalogEntry(entry);
+        }
+        for (const variant of entry.variants || []) {
+          if (this._sampleUrlsMatch(variant.fileUrl, url) || this._sampleUrlsMatch(variant.fileUrlEn, url)) {
+            return this._sampleAnnotationFromCatalogEntry(entry, variant);
+          }
+        }
+      }
+    } catch (_) {
+      // Keep sample loading independent from catalog metadata.
+    }
+    return null;
+  }
+
+  async _resolveSampleAnnotation(detail, fallbackName, url) {
+    const fromDetail = this._sampleAnnotationFromDetail(detail, fallbackName);
+    const fromCatalog = (!fromDetail.source && !fromDetail.sourceUrl)
+      ? await this._sampleAnnotationFromCatalogUrl(url)
+      : null;
+    if (fromCatalog) {
+      return {
+        title: fromDetail.title || fromCatalog.title || '',
+        source: fromDetail.source || fromCatalog.source || '',
+        sourceUrl: fromDetail.sourceUrl || fromCatalog.sourceUrl || '',
+      };
+    }
+    if (fromDetail.title || fromDetail.source || fromDetail.sourceUrl) return fromDetail;
+    return this._sampleAnnotationFromDetail({ name: fallbackName }, fallbackName);
+  }
+
+  _applySampleAnnotation(annotation) {
+    if (!annotation) return;
+    const titleInput = document.getElementById('annotate-title');
+    const sourceInput = document.getElementById('annotate-source');
+    const sourceUrlInput = document.getElementById('annotate-source-url');
+    if (!titleInput && !sourceInput && !sourceUrlInput) return;
+
+    if (titleInput) titleInput.value = annotation.title || '';
+    if (sourceInput) sourceInput.value = annotation.source || '';
+    if (sourceUrlInput) sourceUrlInput.value = annotation.sourceUrl || '';
+    this._applyAnnotation();
+  }
+
   _applyAnnotation() {
     const title = document.getElementById('annotate-title').value.trim();
     const source = document.getElementById('annotate-source').value.trim();
@@ -1389,7 +1515,7 @@ class DvzApp {
           chartKey: this.config.chartKey,
           onSampleSelect: async (detail) => {
             const { url, format, name } = detail || {};
-            if (url) await this._safeLoadSampleData(url, format, name);
+            if (url) await this._safeLoadSampleData(url, format, name, { sampleDetail: detail });
           },
         });
       }
@@ -1397,7 +1523,7 @@ class DvzApp {
       // Fallback: listen for event (older header versions)
       header.addEventListener('sample-data-selected', (e) => {
         const { url, format, name } = e.detail || {};
-        if (url) void this._safeLoadSampleData(url, format, name);
+        if (url) void this._safeLoadSampleData(url, format, name, { sampleDetail: e.detail || {} });
       });
     }
 
@@ -1434,7 +1560,11 @@ class DvzApp {
       const url = (DVZ_LANG === 'ja' ? selected.fileUrl : (selected.fileUrlEn || selected.fileUrl));
       const name = (DVZ_LANG === 'ja' ? selected.name : (selected.nameEn || selected.name));
       if (this._shouldSkipAutoSampleLoad()) return;
-      if (url) await this._safeLoadSampleData(url, selected.format || 'csv', name, { fallbackOnError: true, background: true });
+      if (url) await this._safeLoadSampleData(url, selected.format || 'csv', name, {
+        fallbackOnError: true,
+        background: true,
+        annotation: this._sampleAnnotationFromCatalogEntry(selected),
+      });
       else this._onCatalogEmpty();
     } catch (_) {
       this._onCatalogEmpty();
@@ -1447,6 +1577,10 @@ class DvzApp {
     if (!options.background) dvzShowProcessingToast(t('processingSample'));
     try {
       await Promise.resolve(this._onSampleDataLoaded(url, format, name, options));
+      if (options.background && this._shouldSkipAutoSampleLoad()) return false;
+      const annotation = options.annotation
+        || await this._resolveSampleAnnotation(options.sampleDetail || {}, name, url);
+      this._applySampleAnnotation(annotation);
       return true;
     } catch (err) {
       console.error(`[${this.config.appName}] sample load failed:`, err);

@@ -369,6 +369,31 @@ const MOF_PERIODS = {
   'mof-all':      { start: 1974, end: 2100 },
 };
 
+const SURFACE_SAMPLE_SOURCES = {
+  mof: {
+    source: { ja: '財務省 国債金利情報', en: 'Ministry of Finance Japan, Interest Rate Information' },
+    sourceUrl: 'https://www.mof.go.jp/jgbs/reference/interest_rate/index.htm',
+  },
+  us: {
+    source: { ja: 'U.S. Department of the Treasury', en: 'U.S. Department of the Treasury' },
+    sourceUrl: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve',
+  },
+  births: {
+    source: { ja: '', en: '' },
+    sourceUrl: '',
+  },
+};
+
+function applySurfaceSampleAnnotation(key, title) {
+  const sourceKey = key && key.startsWith('mof-') ? 'mof' : key;
+  const source = SURFACE_SAMPLE_SOURCES[sourceKey] || {};
+  window._surfaceApp?._applySampleAnnotation?.({
+    title: title || '',
+    source: source.source ? (source.source[LANG] || source.source.en || '') : '',
+    sourceUrl: source.sourceUrl || '',
+  });
+}
+
 async function fetchMOFData() {
   if (mofCurves) return; // already loaded
   const response = await fetch(MOF_CSV_FILE);
@@ -903,6 +928,8 @@ async function init() {
                 rowCount: data.rowLabels.length,
                 columns: data.columnLabels,
               });
+              const annotation = await window._surfaceApp?._resolveSampleAnnotation?.(detail, currentDataName, detail.url);
+              window._surfaceApp?._applySampleAnnotation?.(annotation);
               return;
             }
             // Normal CSV
@@ -923,6 +950,8 @@ async function init() {
               rowCount: data.rowLabels.length,
               columns: data.columnLabels,
             });
+            const annotation = await window._surfaceApp?._resolveSampleAnnotation?.(detail, currentDataName, detail.url);
+            window._surfaceApp?._applySampleAnnotation?.(annotation);
           } catch (err) {
             console.error('Sample data load failed:', err);
           }
@@ -971,6 +1000,7 @@ async function init() {
     currentDataName = `${t('mofGroup')} ${t('recent5')}`;
     updateDataNameDisplay();
     loadData(getMOFFilteredData(defaultPeriod.start, defaultPeriod.end));
+    applySurfaceSampleAnnotation('mof-recent5', currentDataName);
   } catch (err) {
     console.error('Default MOF load failed, falling back to US sample:', err);
     try {
@@ -978,6 +1008,7 @@ async function init() {
       currentDataName = t('usTreasury');
       updateDataNameDisplay();
       loadData(fallbackData);
+      applySurfaceSampleAnnotation('us', currentDataName);
     } catch (fallbackErr) {
       console.error('Fallback sample load failed:', fallbackErr);
       throw fallbackErr;
@@ -1483,12 +1514,16 @@ function setupEventListeners() {
         if (!period) return;
         await fetchMOFData();
         loadData(getMOFFilteredData(period.start, period.end));
+        applySurfaceSampleAnnotation(key, currentDataName);
         return;
       }
 
       // Built-in sample data (CSV)
       const csvUrl = SAMPLE_CSV[key];
-      if (csvUrl) loadData(await fetchSampleCSV(csvUrl));
+      if (csvUrl) {
+        loadData(await fetchSampleCSV(csvUrl));
+        applySurfaceSampleAnnotation(key, currentDataName);
+      }
     });
   }
 
@@ -2049,6 +2084,11 @@ class SurfaceChartApp extends DvzApp {
           rowCount: data.rowLabels.length,
           columns: data.columnLabels,
         });
+        this._applySampleAnnotation(this._sampleAnnotationFromDetail({
+          name: t('mofGroup') + ' ' + t('recent5'),
+          source: SURFACE_SAMPLE_SOURCES.mof.source[LANG],
+          sourceUrl: SURFACE_SAMPLE_SOURCES.mof.sourceUrl,
+        }));
       })
       .catch(async (err) => {
         console.error('Catalog fallback (MOF) failed:', err);
@@ -2062,6 +2102,11 @@ class SurfaceChartApp extends DvzApp {
             rowCount: data.rowLabels.length,
             columns: data.columnLabels,
           });
+          this._applySampleAnnotation(this._sampleAnnotationFromDetail({
+            name: t('usTreasury'),
+            source: SURFACE_SAMPLE_SOURCES.us.source[LANG],
+            sourceUrl: SURFACE_SAMPLE_SOURCES.us.sourceUrl,
+          }));
         } catch (fallbackErr) {
           console.error('Catalog fallback (US sample) failed:', fallbackErr);
         }
