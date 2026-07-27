@@ -672,9 +672,16 @@ function dvzInitShareModal() {
   const copyBtn = document.getElementById('dvz-share-copy');
 
   if (closeBtn) closeBtn.addEventListener('click', () => dvzHideModal('dvz-share-modal'));
-  if (copyBtn) copyBtn.addEventListener('click', () => {
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
     const url = document.getElementById('dvz-share-url')?.value;
-    if (url) navigator.clipboard.writeText(url);
+    if (!url) return;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      window.DatavizAnalytics?.trackShareLinkCopied?.('3d-surface-chart');
+    } catch (error) {
+      console.warn('[share] Failed to copy URL', error);
+    }
   });
 }
 
