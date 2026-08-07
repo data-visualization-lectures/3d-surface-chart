@@ -483,6 +483,8 @@ function dvzApplyI18n() {
 // Sidebar tab controller
 // ----------------------------------------------------------
 function initSidebarTabs(defaultTabId = 'tab-data') {
+  if (window.DVZSurfaceChartSettingSidebar?.mount?.(defaultTabId)) return;
+
   const tabs = document.querySelectorAll('.sidebar-tab');
   const panels = document.querySelectorAll('.sidebar-panel');
   const select = document.getElementById('sidebar-tab-select');

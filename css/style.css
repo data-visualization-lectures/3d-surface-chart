@@ -28,6 +28,43 @@
   margin-top: 0 !important;
 }
 
+/*
+ * The shared sidebar owns component styling. This tool only decides when the
+ * WebGL chart and settings must stack so both remain usable.
+ */
+@media (max-width: 1099px) {
+  .dvz-app {
+    flex-direction: column;
+  }
+
+  #main-area {
+    width: 100%;
+    min-height: 0;
+  }
+
+  #dvz-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: min(48dvh, 460px);
+    border-top: 1px solid var(--dvz-setting-sidebar-border, #e5e7eb);
+    border-left: 0;
+  }
+
+  #dvz-sidebar .dvz-setting-sidebar__select-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #dvz-sidebar [data-dvz-setting-tab-select] {
+    display: block;
+  }
+
+  #dvz-sidebar .dvz-setting-sidebar__tabs,
+  #dvz-sidebar [data-dvz-setting-tabs] {
+    display: none;
+  }
+}
+
 .dvz-app [hidden] {
   display: none !important;
 }
