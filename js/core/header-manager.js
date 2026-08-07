@@ -32,7 +32,7 @@
       this.header = null;
       this._buildSavePayload = null;
       this.status = options.enabled === false ? 'disabled' : 'idle';
-      this.lastControlsMode = 'selector';
+      this.lastControlsMode = 'chart';
       this.setupPromise = null;
       this.readyPromise = null;
       this._resolveReady = null;
@@ -252,15 +252,7 @@
     }
 
     showSelectorControls() {
-      this.lastControlsMode = 'selector';
-      window.DVZToolHeaderVisibility?.setVisible?.(false);
-      const header = this.header;
-      if (!header || typeof header.setConfig !== 'function') return;
-
-      header.setConfig({
-        ...this._logoConfig(),
-        buttons: [],
-      });
+      this.showChartControls();
     }
 
     showChartControls() {

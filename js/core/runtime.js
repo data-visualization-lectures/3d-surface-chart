@@ -86,7 +86,12 @@
         getCurrentInstance: () => this.state.currentInstance,
         generateThumbnail: () => this.generateThumbnailAsync(),
         onProjectLoad: (projectData, meta) => {
-          this.handleProjectLoad(projectData, meta);
+          this.handleProjectLoad(projectData, meta).then(() => {
+            this.normalizeEditorUrl({ replace: true, preserveProjectId: true });
+          }).catch((err) => {
+            console.error('Project load failed:', err);
+            dvzShowToast(err.message || String(err), 'error');
+          });
         },
         onProjectMetaChange: (meta, reason) => {
           this.handleProjectMetaChange(meta, reason);
@@ -147,7 +152,7 @@
     }
 
     routeErrorContainer() {
-      return document.getElementById('chart-selector');
+      return document.getElementById('chart-area') || document.getElementById('dvz-chart');
     }
 
     clearRouteError() {
@@ -330,8 +335,8 @@
       el.textContent = message;
 
       container.prepend(el);
-      this.setViewMode('selector');
-      this.headerManager.showSelectorControls();
+      this.setViewMode('chart');
+      this.headerManager.showChartControls();
       dvzShowToast(message, 'error');
     }
 
@@ -369,7 +374,7 @@
     }
 
     setViewMode(mode) {
-      const normalizedMode = mode === 'chart' ? 'chart' : 'selector';
+      const normalizedMode = 'chart';
       const app = document.querySelector('.dvz-app');
       const selector = document.getElementById('chart-selector');
       const chart = document.getElementById('dvz-chart');
@@ -395,60 +400,6 @@
       if (!grid) return;
 
       grid.innerHTML = '';
-
-      const labels = {
-        temporal: { ja: '時系列', en: 'Temporal' },
-        comparison: { ja: '比較', en: 'Comparison' },
-        distribution: { ja: '分布', en: 'Distribution' },
-        hierarchical: { ja: '階層', en: 'Hierarchical' },
-        spatial: { ja: '空間', en: 'Spatial' },
-      };
-
-      const surfaceVariants = ['soft', 'canvas', 'soft-alt'];
-
-      CHART_REGISTRY.forEach((entry, index) => {
-        const card = document.createElement('a');
-        card.className = 'dvz-catalog-card';
-
-        const categoryLabel = labels[entry.category] || { ja: entry.category, en: entry.category };
-        const surfaceVariant = surfaceVariants[index % surfaceVariants.length];
-        const thumbnail = entry.thumbnail || `images/catalog/${entry.id}.png`;
-        const hrefParams = new URLSearchParams(location.search);
-        hrefParams.delete('projectId');
-        hrefParams.set('chart', entry.id);
-
-        card.href = `${location.pathname}?${hrefParams.toString()}${location.hash}`;
-        card.dataset.surface = surfaceVariant;
-        card.setAttribute('aria-label', `${entry.name[this.lang]} — ${entry.description[this.lang]}`);
-        card.innerHTML = `
-          <span class="dvz-catalog-card__panel">
-            <span class="dvz-catalog-card__header">
-              <span class="dvz-catalog-card__eyebrow">${categoryLabel[this.lang]}</span>
-            </span>
-            <span class="dvz-catalog-card__body">
-              <span class="dvz-catalog-card__thumbnail" aria-hidden="true">
-                <img class="dvz-catalog-card__thumbnail-image" src="${thumbnail}" alt="" loading="lazy" onerror="this.hidden=true">
-              </span>
-              <h2 class="dvz-catalog-card__title">${entry.name[this.lang]}</h2>
-              <p class="dvz-catalog-card__description">${entry.description[this.lang]}</p>
-            </span>
-            <span class="dvz-catalog-card__footer">
-              <span class="dvz-catalog-card__meta">チャートを作成する</span>
-              <span class="dvz-catalog-card__glyph" aria-hidden="true">↗</span>
-            </span>
-          </span>
-        `;
-
-        card.addEventListener('click', (event) => {
-          event.preventDefault();
-          this.selectChart(entry.id).catch((err) => {
-            console.error('selectChart failed:', err);
-            dvzShowToast(err.message || String(err), 'error');
-          });
-        });
-
-        grid.appendChild(card);
-      });
     }
 
     injectSidebarContent(meta = {}) {
@@ -562,28 +513,32 @@
       return mod;
     }
 
-    syncUrlForChart(chartId) {
+    normalizeEditorUrl({ replace = true, preserveProjectId = true } = {}) {
       const params = new URLSearchParams(location.search);
-      if (params.has('projectId')) return;
-      if (params.get('chart') === chartId) return;
-      params.set('chart', chartId);
-      const next = `${location.pathname}?${params.toString()}${location.hash}`;
-      history.pushState({ dvzRoute: 'chart', chartId }, '', next);
-    }
+      const before = params.toString();
 
-    syncUrlForSelector({ replace = false } = {}) {
-      const params = new URLSearchParams(location.search);
-      if (params.has('projectId')) return;
-      if (!params.has('chart')) return;
       params.delete('chart');
-      const qs = params.toString();
-      const next = `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`;
-      const state = { dvzRoute: 'selector' };
+      params.delete('project_id');
+      if (!preserveProjectId) params.delete('projectId');
+
+      const after = params.toString();
+      if (after === before) return;
+
+      const next = `${location.pathname}${after ? `?${after}` : ''}${location.hash}`;
+      const state = { dvzRoute: 'chart', chartId: this.config.defaultChartId };
       if (replace) {
         history.replaceState(state, '', next);
       } else {
         history.pushState(state, '', next);
       }
+    }
+
+    syncUrlForChart(_chartId) {
+      this.normalizeEditorUrl({ replace: true, preserveProjectId: true });
+    }
+
+    syncUrlForSelector({ replace = false } = {}) {
+      this.normalizeEditorUrl({ replace, preserveProjectId: true });
     }
 
     async selectChart(chartId, { updateUrl = true } = {}) {
@@ -657,15 +612,16 @@
     }
 
     showSelector({ updateUrl = true } = {}) {
-      this.selectRequestId += 1;
-      this.teardownChart();
-      this.state.currentChartId = null;
-      this.state.currentProjectId = null;
-      this.state.currentProjectName = null;
-      this.clearProjectSnapshot();
-      this.headerManager.showSelectorControls();
-      this.setViewMode('selector');
-      if (updateUrl) this.syncUrlForSelector();
+      this.headerManager.showChartControls();
+      this.setViewMode('chart');
+      if (updateUrl) this.syncUrlForSelector({ replace: true });
+
+      if (!this.state.currentInstance && this.config.defaultChartId) {
+        this.selectChart(this.config.defaultChartId, { updateUrl: false }).catch((err) => {
+          console.error('default chart restore failed:', err);
+          dvzShowToast(err.message || String(err), 'error');
+        });
+      }
     }
 
     getWrappedProjectData() {
@@ -798,6 +754,7 @@
           return;
         }
         await this.handleProjectLoad(data);
+        this.normalizeEditorUrl({ replace: true, preserveProjectId: true });
       } catch (err) {
         console.error('Auto project load failed:', err);
         this.showRouteError(
@@ -824,7 +781,7 @@
         return;
       }
 
-      this.showSelector({ updateUrl });
+      await this.selectChart(this.config.defaultChartId, { updateUrl });
     }
 
     async init() {
@@ -839,34 +796,9 @@
         });
       });
 
-      let route = window.DVZBuilderRouting.parseIndexRoute(location.search);
-      if (route.ok && route.mode === 'selector') {
-        const dataUrl = new URLSearchParams(location.search).get('data_url');
-        if (dataUrl) {
-          try {
-            const chartId = await this.resolveChartIdFromDataUrl(dataUrl);
-            if (chartId) {
-              route = {
-                ok: true,
-                mode: 'chart',
-                chartId,
-              };
-            }
-          } catch (err) {
-            console.warn('Chart resolution from data_url failed:', err);
-          }
-        }
-      }
+      const route = window.DVZBuilderRouting.parseIndexRoute(location.search);
 
-      if (route.ok && route.mode === 'selector' && this.config.defaultChartId) {
-        route = {
-          ok: true,
-          mode: 'chart',
-          chartId: this.config.defaultChartId,
-        };
-      }
-
-      await this.applyRoute(route, { updateUrl: false });
+      await this.applyRoute(route, { updateUrl: true });
       this.headerSetupPromise = this.headerManager.setup();
     }
   }

@@ -65,21 +65,12 @@
 
 
     const projectId = clean(params.get('projectId'));
-    const chartId = clean(params.get('chart'));
 
     if (projectId) {
       return {
         ok: true,
         mode: 'project',
         projectId,
-      };
-    }
-
-    if (chartId) {
-      return {
-        ok: true,
-        mode: 'chart',
-        chartId,
       };
     }
 
