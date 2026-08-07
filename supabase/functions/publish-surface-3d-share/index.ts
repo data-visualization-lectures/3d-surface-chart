@@ -1,14 +1,16 @@
-// Supabase Edge Function: publish saved project state into a reusable share row
+// Supabase Edge Function: publish a saved 3D Surface Chart project to a public share row.
 //
 // Deploy:
-//   supabase functions deploy publish-interactive-chart-builder-share --no-verify-jwt
+//   supabase functions deploy publish-surface-3d-share --no-verify-jwt
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DATAVIZ_API_URL = Deno.env.get("DATAVIZ_API_URL") || "https://api.dataviz.jp";
-const SHARE_TABLE = "interactive_chart_builder_shares";
+const DATAVIZ_API_URL = Deno.env.get("DATAVIZ_API_URL") ||
+  "https://api.dataviz.jp";
+const SHARE_TABLE = "surface_3d_shares";
+const CHART_TYPE = "3d-surface-chart";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -43,7 +45,9 @@ function serializeUnknownError(error: unknown) {
     const record = error as Record<string, unknown>;
     return {
       type: "Object",
-      message: typeof record.message === "string" ? record.message : String(error),
+      message: typeof record.message === "string"
+        ? record.message
+        : String(error),
       code: typeof record.code === "string" ? record.code : null,
       details: typeof record.details === "string" ? record.details : null,
       hint: typeof record.hint === "string" ? record.hint : null,
@@ -90,102 +94,71 @@ function extractProjectPayload(payload: unknown) {
     throw new Error("invalid_project_payload");
   }
 
-  const record = payload as Record<string, unknown>;
-  const projectName = typeof record.name === "string"
-    ? record.name
-    : typeof (record.project as Record<string, unknown> | undefined)?.name === "string"
-      ? String((record.project as Record<string, unknown>).name)
-      : "";
+  const projectData = payload as Record<string, unknown>;
+  const settings = projectData.settings;
 
-  const candidate = record.data && typeof record.data === "object"
-    ? record.data as Record<string, unknown>
-    : record;
-
-  const chartType = typeof candidate.chartType === "string" ? candidate.chartType : "";
-  const chartData = candidate.chartData;
-
-  if (!chartType || !chartData || typeof chartData !== "object") {
+  if (
+    projectData.chartType !== CHART_TYPE ||
+    projectData.data == null ||
+    !settings ||
+    typeof settings !== "object" ||
+    Array.isArray(settings)
+  ) {
     throw new Error("invalid_project_payload");
   }
 
-  const normalizedChartData = chartData as Record<string, unknown>;
-
-  return {
-    projectName,
-    projectData: {
-      chartType,
-      chartData: cloneJson(normalizedChartData),
-    },
-  };
+  return cloneJson(projectData);
 }
 
-function buildShareChartConfig(projectData: { chartType: string; chartData: Record<string, unknown> }) {
-  const chartConfig = cloneJson(projectData.chartData);
-  chartConfig.chartType = projectData.chartType;
-  return chartConfig;
-}
-
-function resolveShareTitle(chartConfig: Record<string, unknown>, fallbackTitle: string, projectName: string) {
-  const settings = chartConfig.settings && typeof chartConfig.settings === "object"
-    ? chartConfig.settings as Record<string, unknown>
-    : null;
+function resolveShareTitle(
+  chartConfig: Record<string, unknown>,
+  fallbackTitle: string,
+) {
+  const settings =
+    chartConfig.settings && typeof chartConfig.settings === "object"
+      ? chartConfig.settings as Record<string, unknown>
+      : null;
 
   const candidates = [
-    typeof chartConfig.annotateTitle === "string" ? chartConfig.annotateTitle : "",
+    typeof chartConfig.annotateTitle === "string"
+      ? chartConfig.annotateTitle
+      : "",
     typeof settings?.annotateTitle === "string" ? settings.annotateTitle : "",
     fallbackTitle,
-    projectName,
     "3D Surface Chart",
   ];
 
-  return candidates.map((value) => String(value || "").trim()).find(Boolean) || "3D Surface Chart";
+  return candidates.map((value) => String(value || "").trim()).find(Boolean) ||
+    "3D Surface Chart";
 }
 
 async function loadSavedProject(projectId: string, accessToken: string) {
-  const response = await fetch(`${DATAVIZ_API_URL}/api/projects/${encodeURIComponent(projectId)}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+  const response = await fetch(
+    `${DATAVIZ_API_URL}/api/projects/${encodeURIComponent(projectId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     },
-  });
+  );
 
   if (!response.ok) {
-    const errorPayload = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
-    const message = errorPayload?.error || errorPayload?.detail || `Project API error: ${response.status}`;
+    const errorPayload = await response.json().catch(async () => ({
+      error: await response.text().catch(() => ""),
+    }));
+    const message = errorPayload?.error || errorPayload?.detail ||
+      `Project API error: ${response.status}`;
     throw new Error(message);
   }
 
   return response.json();
 }
 
-async function saveShareForProject(projectId: string, payload: Record<string, unknown>) {
-  const { data: existingShare, error: lookupError } = await supabase
-    .from(SHARE_TABLE)
-    .select("id")
-    .eq("source_project_id", projectId)
-    .maybeSingle();
-
-  if (lookupError) {
-    throw lookupError;
-  }
-
-  if (existingShare?.id) {
-    const { data, error } = await supabase
-      .from(SHARE_TABLE)
-      .update(payload)
-      .eq("id", existingShare.id)
-      .select("id, title, source_project_id")
-      .single();
-
-    if (error) {
-      throw error;
-    }
-    return data;
-  }
-
+async function saveShare(payload: Record<string, unknown>) {
   const { data, error } = await supabase
     .from(SHARE_TABLE)
     .insert(payload)
-    .select("id, title, source_project_id")
+    .select("id, title")
     .single();
 
   if (error) {
@@ -211,7 +184,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Login required" }, 401);
   }
 
-  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+  const body = await req.json().catch(() => null) as
+    | Record<string, unknown>
+    | null;
   const projectId = String(body?.projectId || "").trim();
   const fallbackTitle = String(body?.fallbackTitle || "").trim();
   if (!projectId) {
@@ -220,28 +195,25 @@ Deno.serve(async (req) => {
 
   try {
     const savedProjectResponse = await loadSavedProject(projectId, accessToken);
-    const { projectName, projectData } = extractProjectPayload(savedProjectResponse);
-    const chartConfig = buildShareChartConfig(projectData);
-    const title = resolveShareTitle(chartConfig, fallbackTitle, projectName);
+    const chartConfig = extractProjectPayload(savedProjectResponse);
+    const title = resolveShareTitle(chartConfig, fallbackTitle);
     const createdBy = decodeJwtSubject(accessToken);
 
     const payload: Record<string, unknown> = {
       title,
       chart_config: chartConfig,
-      source_project_id: projectId,
     };
     if (createdBy) payload.created_by = createdBy;
 
-    const data = await saveShareForProject(projectId, payload);
+    const data = await saveShare(payload);
 
     return jsonResponse({
       shareId: data.id,
       title: data.title,
-      sourceProjectId: data.source_project_id,
     });
   } catch (error) {
     const serializedError = serializeUnknownError(error);
-    console.error("[publish-interactive-chart-builder-share] failed", {
+    console.error("[publish-surface-3d-share] failed", {
       projectId,
       serializedError,
     });

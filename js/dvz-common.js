@@ -557,7 +557,7 @@ async function dvzPublishShareFromProject(options = {}) {
     throw new Error('Login required');
   }
 
-  const response = await fetch(`${DVZ_SUPABASE_URL}/functions/v1/publish-interactive-chart-builder-share`, {
+  const response = await fetch(`${DVZ_SUPABASE_URL}/functions/v1/publish-surface-3d-share`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -574,34 +574,6 @@ async function dvzPublishShareFromProject(options = {}) {
     throw new Error(payload?.error || payload?.message || `Share publish failed (${response.status})`);
   }
   return payload || {};
-}
-
-async function dvzFindShareByProjectId(table, projectId) {
-  const normalizedProjectId = String(projectId || '').trim();
-  if (!normalizedProjectId) return null;
-
-  const sb = dvzGetShareSupabase();
-  if (!sb) throw new Error('Supabase not loaded');
-
-  const { data, error } = await sb
-    .from(table)
-    .select('id, title, source_project_id')
-    .eq('source_project_id', normalizedProjectId)
-    .limit(1);
-
-  if (error) {
-    const detail = [
-      error?.message || '',
-      error?.details || '',
-      error?.hint || '',
-    ].join(' ').toLowerCase();
-    if (detail.includes('source_project_id')) {
-      throw new Error('interactive_chart_builder_shares.source_project_id is required. Run the 20260429 share migration.');
-    }
-    throw error;
-  }
-
-  return Array.isArray(data) && data.length ? data[0] : null;
 }
 
 // ----------------------------------------------------------
@@ -1010,7 +982,7 @@ class DvzApp {
     this._legendResizeObserver.observe(target);
   }
 
-  _removeLegacyLegendNodes() {
+  _removeStaleLegendNodes() {
     const container = this._getLegendContainer();
     const wrapper = document.getElementById('wrapper');
     const targets = [container, wrapper].filter(Boolean);
@@ -1197,7 +1169,7 @@ class DvzApp {
     const position = document.getElementById('legend-position')?.value || 'none';
     const items = this._getLegendItems();
     this._ensureLegendResizeObserver();
-    this._removeLegacyLegendNodes();
+    this._removeStaleLegendNodes();
 
     // Clear existing legends
     const svg = d3.select('#wrapper');

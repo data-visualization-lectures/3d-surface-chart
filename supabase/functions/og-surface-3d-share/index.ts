@@ -1,7 +1,7 @@
-// Supabase Edge Function: OGP対応シェアページ (Interactive Chart Builder)
-// SNSクローラーにはOGPメタタグを返し、人間のユーザーには302リダイレクトする
+// Supabase Edge Function: OGP response for 3D Surface Chart shares.
 //
-// デプロイ: supabase functions deploy og-interactive-chart-builder-share --no-verify-jwt
+// Deploy:
+//   supabase functions deploy og-surface-3d-share --no-verify-jwt
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -9,6 +9,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const DEPLOY_ORIGIN = "https://3d-surface-chart.dataviz.jp";
 const DEFAULT_OG_IMAGE = `${DEPLOY_ORIGIN}/images/og-default.png`;
+const SHARE_TABLE = "surface_3d_shares";
+const OG_IMAGE_BUCKET = "surface-3d-og-images";
 const BOT_UA_PATTERN =
   /Twitterbot|facebookexternalhit|Facebot|LinkedInBot|Slackbot|Discordbot|LINE|Googlebot|bingbot/i;
 const SHARE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -31,7 +33,7 @@ function escapeToAsciiHtml(str: string): string {
 
 async function resolveOgImageUrl(id: string) {
   const shareOgImage =
-    `${SUPABASE_URL}/storage/v1/object/public/interactive-chart-builder-og-images/${id}.png`;
+    `${SUPABASE_URL}/storage/v1/object/public/${OG_IMAGE_BUCKET}/${id}.png`;
 
   try {
     const response = await fetch(shareOgImage, { method: "HEAD" });
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: share } = await supabase
-    .from("interactive_chart_builder_shares")
+    .from(SHARE_TABLE)
     .select("title")
     .eq("id", id)
     .single();
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
     share?.title || "3D Surface Chart",
   );
   const ogDesc = escapeToAsciiHtml(
-    "3D Surface Chart \u2014 dataviz.jp",
+    "3D Surface Chart - dataviz.jp",
   );
   const siteName = escapeToAsciiHtml("3D Surface Chart");
   const escapedShareUrl = escapeToAsciiHtml(shareUrl);
@@ -107,7 +109,7 @@ Deno.serve(async (req) => {
 <title>${ogTitle}</title>
 </head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;line-height:1.5;color:#111827;">
-<p>Redirecting to the shared chart…</p>
+<p>Redirecting to the shared chart...</p>
 <p><a href="${escapedShareUrl}">Open the shared chart</a></p>
 </body>
 </html>`;

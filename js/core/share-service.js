@@ -36,6 +36,7 @@
   class BuilderShareService {
     constructor(options = {}) {
       this.publicShareOrigin = options.publicShareOrigin || 'https://3d-surface-chart.dataviz.jp';
+      this.shareFunctionOrigin = options.shareFunctionOrigin || 'https://vebhoeiltxspsurqoxvl.supabase.co/functions/v1';
       this.defaultEmbedAspectRatio = options.defaultEmbedAspectRatio || '16/10';
       this.embedTitleFallback = options.embedTitleFallback || '3D Surface Chart';
       this.embedViewportGutterPx = Number(options.embedViewportGutterPx || 24);
@@ -43,6 +44,10 @@
 
     buildPublicSharePageUrl(shareId) {
       return `${this.publicShareOrigin}/share.html?id=${encodeURIComponent(shareId)}`;
+    }
+
+    buildOgShareUrl(shareId) {
+      return `${this.shareFunctionOrigin}/og-surface-3d-share?id=${encodeURIComponent(shareId)}`;
     }
 
     buildEmbedSrc(shareId) {
@@ -173,7 +178,7 @@
         if (!pngBlob) return false;
 
         const { error } = await sb.storage
-          .from('interactive-chart-builder-og-images')
+          .from('surface-3d-og-images')
           .upload(`${shareId}.png`, pngBlob, { contentType: 'image/png', upsert: true });
 
         if (error) throw error;

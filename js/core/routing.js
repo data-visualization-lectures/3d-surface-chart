@@ -1,5 +1,5 @@
 // ============================================================
-// Interactive Chart Builder - Routing Contracts
+// 3D Surface Chart - Routing Contracts
 // ============================================================
 
 (function () {
@@ -18,9 +18,9 @@
         ja: '共有URLは `share.html?id=...` を使用してください。',
         en: 'Use `share.html?id=...` for shared chart URLs.',
       },
-      indexLegacyShareId: {
-        ja: '旧URLパラメータ `shareId` は非対応です。`share.html?id=...` を使用してください。',
-        en: 'Legacy URL parameter `shareId` is not supported. Use `share.html?id=...` instead.',
+      unsupportedShareIdParam: {
+        ja: '`shareId` URLパラメータは非対応です。`share.html?id=...` を使用してください。',
+        en: 'The `shareId` URL parameter is not supported. Use `share.html?id=...` instead.',
       },
       shareMissingId: {
         ja: 'シェアIDが指定されていません。`share.html?id=...` を使用してください。',
@@ -30,9 +30,13 @@
         ja: 'シェアIDの形式が不正です。',
         en: 'Invalid share id format.',
       },
-      shareLegacyProjectId: {
-        ja: '旧URL形式は非対応です。`share.html?id=...` を使用してください。',
-        en: 'Legacy URL format is not supported. Use `share.html?id=...`.',
+      unsupportedShareRouteParam: {
+        ja: 'この共有ページでは `id` 以外の読込URLパラメータは使用しません。`share.html?id=...` を使用してください。',
+        en: 'This share page only accepts the `id` load parameter. Use `share.html?id=...`.',
+      },
+      unsupportedChartParam: {
+        ja: 'このツールでは `chart` URLパラメータは使用しません。`/` または `?projectId=...` を使用してください。',
+        en: 'This tool does not use the `chart` URL parameter. Use `/` or `?projectId=...`.',
       },
     };
 
@@ -50,8 +54,8 @@
     if (params.has('shareId')) {
       return {
         ok: false,
-        code: 'legacy_share_id',
-        message: msg('indexLegacyShareId'),
+        code: 'unsupported_share_id_param',
+        message: msg('unsupportedShareIdParam'),
       };
     }
 
@@ -63,6 +67,14 @@
       };
     }
 
+
+    if (params.has('chart')) {
+      return {
+        ok: false,
+        code: 'unsupported_chart_param',
+        message: msg('unsupportedChartParam'),
+      };
+    }
 
     const projectId = clean(params.get('projectId'));
 
@@ -87,8 +99,8 @@
     if (params.has('projectId') || params.has('shareId')) {
       return {
         ok: false,
-        code: 'legacy_share_route',
-        message: msg('shareLegacyProjectId'),
+        code: 'unsupported_share_route_param',
+        message: msg('unsupportedShareRouteParam'),
       };
     }
 
