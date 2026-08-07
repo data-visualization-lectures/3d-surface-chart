@@ -8,7 +8,7 @@
   // ── Config ──────────────────────────────────────────────
   const SUPABASE_URL = 'https://vebhoeiltxspsurqoxvl.supabase.co';
   const SUPABASE_ANON_KEY = DVZ_SUPABASE_ANON_KEY; // from dvz-common.js
-  const SHARE_TABLE = 'interactive_chart_builder_shares';
+  const SHARE_TABLE = 'surface_3d_shares';
   const TIMEOUT_MS = 30000;
   const SHARE_FETCH_TIMEOUT_MS = 8000;
   const CLIENT_FETCH_TIMEOUT_MS = 10000;
@@ -175,23 +175,12 @@
       if (!entry) throw new Error(LANG === 'ja' ? '不明なチャートタイプです' : 'Unknown chart type');
 
       const annotateTitle = pickAnnotationValue(config?.annotateTitle, config?.settings?.annotateTitle);
-      const defaultChartTitles = [...new Set([
-        entry?.name?.[LANG],
-        entry?.name?.ja,
-        entry?.name?.en,
-      ].filter(Boolean).map((value) => String(value).trim()))];
       const hasStoredTitle = typeof share.title === 'string';
       let pageTitleText;
       if (annotateTitle !== null) {
         pageTitleText = annotateTitle;
       } else if (hasStoredTitle) {
-        const normalizedShareTitle = String(share.title).trim();
-        // Legacy compatibility: old shares stored chart default name even when title was empty.
-        if (normalizedShareTitle && defaultChartTitles.includes(normalizedShareTitle)) {
-          pageTitleText = '';
-        } else {
-          pageTitleText = share.title;
-        }
+        pageTitleText = share.title;
       } else {
         pageTitleText = entry.name[LANG] || 'Chart';
       }
@@ -206,7 +195,7 @@
       const sourceEl = document.getElementById('chart-source');
       if (sourceEl) renderSource(sourceEl, config);
 
-      const ogImageUrl = `${SUPABASE_URL}/storage/v1/object/public/interactive-chart-builder-og-images/${shareId}.png`;
+      const ogImageUrl = `${SUPABASE_URL}/storage/v1/object/public/surface-3d-og-images/${shareId}.png`;
       document.querySelector('meta[property="og:image"]')?.setAttribute('content', ogImageUrl);
       document.querySelector('meta[name="twitter:image"]')?.setAttribute('content', ogImageUrl);
 

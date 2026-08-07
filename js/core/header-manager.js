@@ -1,5 +1,5 @@
 // ============================================================
-// Interactive Chart Builder - Tool Header Manager
+// 3D Surface Chart - Tool Header Manager
 // ============================================================
 
 (function () {
@@ -40,7 +40,7 @@
     }
 
     _wrapLoadProject(header, setCurrentProjectMeta) {
-      if (!header || typeof header.loadProject !== 'function' || header.__dvzLoadProjectWrapped === '1') {
+      if (!header || typeof header.loadProject !== 'function' || header.__dvzLoadProjectPatched === '1') {
         return;
       }
 
@@ -54,7 +54,7 @@
         }
         return data;
       };
-      header.__dvzLoadProjectWrapped = '1';
+      header.__dvzLoadProjectPatched = '1';
     }
 
     _ensureReadyPromise() {
@@ -149,7 +149,7 @@
       const {
         appName,
         logoText,
-        getWrappedProjectData,
+        getProjectData,
         getCurrentProjectMeta,
         setCurrentProjectMeta,
         generateThumbnail,
@@ -161,7 +161,7 @@
       } = this.options;
 
       this._buildSavePayload = async () => {
-        const data = getWrappedProjectData?.();
+        const data = getProjectData?.();
         if (!data) return null;
 
         const projectMeta = getCurrentProjectMeta?.() || {};

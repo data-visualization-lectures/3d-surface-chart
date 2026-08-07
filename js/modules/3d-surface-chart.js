@@ -11,7 +11,7 @@ const TOOL_CONFIG = {
   title:      LANG === 'ja' ? '3Dサーフェス・チャート' : '3D Surface Chart',
   gaId:       'G-XXXXXXXXXX',
   exportName: '3d-surface-chart',
-  shareTable: 'interactive_chart_builder_shares',
+  shareTable: 'surface_3d_shares',
 };
 
 const I18N = {
@@ -1384,7 +1384,7 @@ function updateLabels() {
 
 // ===== SECTION 11: COLOR LEGEND =====
 function buildLegend() {
-  // Legacy buildLegend — now handled by SurfaceChartApp._renderLegend()
+  // buildLegend is handled by SurfaceChartApp._renderLegend().
   // Trigger the DvzApp legend if app instance exists
   if (window._surfaceApp) window._surfaceApp._renderLegend();
 }
@@ -1590,7 +1590,7 @@ function setupEventListeners() {
   }
 
   // CSV upload — handled by template dropzone (dvzInitFileUpload) in SurfaceChartApp.start()
-  // Legacy CSV button support (if elements exist)
+  // Optional CSV button support (if elements exist)
   document.getElementById('csv-btn')?.addEventListener('click', () => {
     document.getElementById('csv-input')?.click();
   });
@@ -1625,7 +1625,7 @@ function setupEventListeners() {
     document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
   });
 
-  // Share button — handled by the orchestrator (interactive-chart-builder.js)
+  // Share button is handled by the outer bootstrap.
 }
 
 // ===== SECTION 16: RESIZE =====
@@ -1834,6 +1834,7 @@ function showToast(msg, type, duration) {
 }
 
 function getProjectData() {
+  if (!currentData) return null;
   readAxisTitleInputs();
   return DVZSettingsCompat.build(SETTINGS_SPEC, {
     data: currentData,
@@ -1855,8 +1856,9 @@ function restoreProject(project) {
   const { data, settings } = normalized;
   const parsedData = normalizeLoadedData(data);
   if (!parsedData || parsedData.rowLabels.length < 2) {
-    showToast(t('alertParseError') + t('alertInvalidProjectData'), 'error');
-    return;
+    const message = t('alertParseError') + t('alertInvalidProjectData');
+    showToast(message, 'error');
+    throw new Error(message);
   }
 
   // Restore data & data name

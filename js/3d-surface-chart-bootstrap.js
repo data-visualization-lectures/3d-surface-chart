@@ -121,7 +121,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const initialRoute = window.DVZBuilderRouting?.parseIndexRoute?.(location.search);
-    setToolHeaderVisible(Boolean(initialRoute?.ok && initialRoute.mode !== 'selector'));
+    setToolHeaderVisible(Boolean(initialRoute?.ok && !isEmbedMode));
     mountEditorShell();
 
     runtime.init().catch((err) => {

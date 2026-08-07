@@ -1,5 +1,5 @@
 // ============================================================
-// Chart Builder - Main Runtime
+// 3D Surface Chart - Main Runtime
 // ============================================================
 
 (function () {
@@ -13,22 +13,6 @@
     defaultChartId: '3d-surface-chart',
     headerEnabled: true,
   };
-
-  function parseCompatibleToolToken(token) {
-    const value = String(token || '').trim();
-    const slashIndex = value.indexOf('/');
-    if (slashIndex === -1) {
-      return {
-        baseTool: value,
-        chartKey: null,
-      };
-    }
-
-    return {
-      baseTool: value.slice(0, slashIndex),
-      chartKey: value.slice(slashIndex + 1) || null,
-    };
-  }
 
   function pickAnnotationValue(...values) {
     for (const value of values) {
@@ -55,7 +39,6 @@
       };
 
       this.loadedScripts = new Set();
-      this.catalogEntries = null;
       this.headerSetupPromise = null;
       this.selectRequestId = 0;
 
@@ -73,7 +56,7 @@
         enabled: this.config.headerEnabled !== false,
         appName: this.config.appName,
         logoText: this.config.title,
-        getWrappedProjectData: () => this.getWrappedProjectData(),
+        getProjectData: () => this.getProjectData(),
         getCurrentProjectMeta: () => ({
           id: this.state.currentProjectId,
           name: this.state.currentProjectName,
@@ -109,46 +92,8 @@
       });
     }
 
-    getRegistryEntry(id) {
+    getRegistryEntry(id = this.config.defaultChartId) {
       return CHART_REGISTRY.find((chart) => chart.id === id);
-    }
-
-    async getCatalogEntries() {
-      if (this.catalogEntries) return this.catalogEntries;
-
-      const catalogUrl = `${window.datavizAuthUrl || 'https://app.dataviz.jp'}/catalog.json`;
-      const res = await fetch(catalogUrl);
-      if (!res.ok) {
-        throw new Error(`Failed to load catalog: ${res.status}`);
-      }
-
-      const catalog = await res.json();
-      this.catalogEntries = catalog.entries || [];
-      return this.catalogEntries;
-    }
-
-    findCatalogEntryForDataUrl(entries, dataUrl) {
-      return (entries || []).find((entry) => {
-        if (entry.fileUrl === dataUrl || entry.fileUrlEn === dataUrl) return true;
-
-        return (entry.variants || []).some((variant) =>
-          variant.fileUrl === dataUrl || variant.fileUrlEn === dataUrl
-        );
-      }) || null;
-    }
-
-    async resolveChartIdFromDataUrl(dataUrl) {
-      if (!dataUrl) return null;
-
-      const entries = await this.getCatalogEntries();
-      const entry = this.findCatalogEntryForDataUrl(entries, dataUrl);
-      if (!entry) return null;
-
-      const token = (entry.compatibleTools || [])
-        .map(parseCompatibleToolToken)
-        .find((item) => item.baseTool === this.config.appName && item.chartKey);
-
-      return token?.chartKey || null;
     }
 
     routeErrorContainer() {
@@ -214,51 +159,42 @@
       };
     }
 
-    applyAnnotationStateToChartData(chartData) {
-      if (!chartData || typeof chartData !== 'object') return chartData;
+    applyAnnotationStateToProjectData(projectData) {
+      if (!projectData || typeof projectData !== 'object') return projectData;
 
       const annotationState = this.collectAnnotationState();
-      chartData.annotateTitle = annotationState.title;
-      chartData.annotateSource = annotationState.source;
-      chartData.annotateSourceUrl = annotationState.sourceUrl;
-      chartData.legendPosition = annotationState.legendPosition;
+      projectData.annotateTitle = annotationState.title;
+      projectData.annotateSource = annotationState.source;
+      projectData.annotateSourceUrl = annotationState.sourceUrl;
+      projectData.legendPosition = annotationState.legendPosition;
 
-      if (chartData.settings && typeof chartData.settings === 'object') {
-        chartData.settings.annotateTitle = annotationState.title;
-        chartData.settings.annotateSource = annotationState.source;
-        chartData.settings.annotateSourceUrl = annotationState.sourceUrl;
-        chartData.settings.legendPosition = annotationState.legendPosition;
+      if (projectData.settings && typeof projectData.settings === 'object') {
+        projectData.settings.annotateTitle = annotationState.title;
+        projectData.settings.annotateSource = annotationState.source;
+        projectData.settings.annotateSourceUrl = annotationState.sourceUrl;
+        projectData.settings.legendPosition = annotationState.legendPosition;
       }
 
-      return chartData;
+      return projectData;
     }
 
-    restoreAnnotationStateFromChartData(chartData, fallbackData = {}) {
-      const settings = chartData?.settings && typeof chartData.settings === 'object' ? chartData.settings : {};
-      const fallbackSettings = fallbackData?.settings && typeof fallbackData.settings === 'object' ? fallbackData.settings : {};
+    restoreAnnotationStateFromProjectData(projectData) {
+      const settings = projectData?.settings && typeof projectData.settings === 'object' ? projectData.settings : {};
       const title = pickAnnotationValue(
-        chartData?.annotateTitle,
-        settings.annotateTitle,
-        fallbackData?.annotateTitle,
-        fallbackSettings.annotateTitle
+        projectData?.annotateTitle,
+        settings.annotateTitle
       );
       const source = pickAnnotationValue(
-        chartData?.annotateSource,
-        settings.annotateSource,
-        fallbackData?.annotateSource,
-        fallbackSettings.annotateSource
+        projectData?.annotateSource,
+        settings.annotateSource
       );
       const sourceUrl = pickAnnotationValue(
-        chartData?.annotateSourceUrl,
-        settings.annotateSourceUrl,
-        fallbackData?.annotateSourceUrl,
-        fallbackSettings.annotateSourceUrl
+        projectData?.annotateSourceUrl,
+        settings.annotateSourceUrl
       );
       const legendPosition = pickAnnotationValue(
-        chartData?.legendPosition,
-        settings.legendPosition,
-        fallbackData?.legendPosition,
-        fallbackSettings.legendPosition
+        projectData?.legendPosition,
+        settings.legendPosition
       ) || null;
 
       const annotateTitle = document.getElementById('annotate-title');
@@ -282,7 +218,7 @@
     }
 
     hasUnsavedProjectChanges() {
-      const currentPayload = this.getWrappedProjectData();
+      const currentPayload = this.getProjectData();
       if (!currentPayload) return false;
 
       const currentSerialized = this.serializeProjectPayload(currentPayload);
@@ -319,7 +255,7 @@
       }
 
       if (reason === 'save') {
-        this.updateProjectSnapshot(this.getWrappedProjectData());
+        this.updateProjectSnapshot(this.getProjectData());
       }
     }
 
@@ -373,33 +309,22 @@
       return `${path}${path.includes('?') ? '&' : '?'}v=${encodeURIComponent(rev)}`;
     }
 
-    setViewMode(mode) {
-      const normalizedMode = 'chart';
+    setViewMode() {
       const app = document.querySelector('.dvz-app');
-      const selector = document.getElementById('chart-selector');
       const chart = document.getElementById('dvz-chart');
       const sidebar = document.getElementById('dvz-sidebar');
 
-      const showChart = normalizedMode === 'chart';
-      if (app) app.dataset.dvzView = normalizedMode;
+      if (app) app.dataset.dvzView = 'chart';
 
       [
-        [selector, showChart],
-        [chart, !showChart],
-        [sidebar, !showChart],
+        [chart, false],
+        [sidebar, false],
       ].forEach(([el, hidden]) => {
         if (!el) return;
         el.hidden = hidden;
         el.setAttribute('aria-hidden', hidden ? 'true' : 'false');
         el.style.removeProperty('display');
       });
-    }
-
-    renderSelector() {
-      const grid = document.getElementById('chart-selector-grid');
-      if (!grid) return;
-
-      grid.innerHTML = '';
     }
 
     injectSidebarContent(meta = {}) {
@@ -444,9 +369,6 @@
 
       const title = document.getElementById('chart-title');
       if (title) title.textContent = '';
-
-      const typeName = document.getElementById('chart-type-name');
-      if (typeName) typeName.textContent = '';
 
       const source = document.getElementById('chart-source');
       if (source) source.textContent = '';
@@ -537,16 +459,11 @@
       this.normalizeEditorUrl({ replace: true, preserveProjectId: true });
     }
 
-    syncUrlForSelector({ replace = false } = {}) {
-      this.normalizeEditorUrl({ replace, preserveProjectId: true });
-    }
-
     async selectChart(chartId, { updateUrl = true } = {}) {
       const requestId = ++this.selectRequestId;
       const isCurrentRequest = () => requestId === this.selectRequestId;
       const entry = this.getRegistryEntry(chartId);
       if (!entry) {
-        this.syncUrlForSelector({ replace: true });
         this.showRouteError(this.lang === 'ja' ? `不明なチャートIDです: ${chartId}` : `Unknown chart id: ${chartId}`);
         return;
       }
@@ -561,7 +478,6 @@
       } catch (err) {
         if (!isCurrentRequest()) return;
         console.error('Chart template load failed:', err);
-        this.syncUrlForSelector({ replace: true });
         const chartTitle = entry?.name?.[this.lang] || entry?.name?.ja || entry?.name?.en || chartId;
         const detail = err?.message || String(err);
         this.showRouteError(
@@ -582,10 +498,6 @@
       if (updateUrl) this.syncUrlForChart(chartId);
 
       this.state.currentChartId = chartId;
-
-      const chartTitle = entry?.name?.[this.lang] || entry?.name?.ja || entry?.name?.en || '';
-      const typeNameEl = document.getElementById('chart-type-name');
-      if (typeNameEl) typeNameEl.textContent = chartTitle;
 
       this.setViewMode('chart');
 
@@ -611,35 +523,20 @@
       }
     }
 
-    showSelector({ updateUrl = true } = {}) {
-      this.headerManager.showChartControls();
-      this.setViewMode('chart');
-      if (updateUrl) this.syncUrlForSelector({ replace: true });
-
-      if (!this.state.currentInstance && this.config.defaultChartId) {
-        this.selectChart(this.config.defaultChartId, { updateUrl: false }).catch((err) => {
-          console.error('default chart restore failed:', err);
-          dvzShowToast(err.message || String(err), 'error');
-        });
-      }
-    }
-
-    getWrappedProjectData() {
+    getProjectData() {
       if (!this.state.currentInstance || !this.state.currentChartId) return null;
-      const rawChartData = this.state.currentInstance._getProjectData?.();
-      if (!rawChartData) return null;
-      const chartData = this.applyAnnotationStateToChartData(this.cloneProjectData(rawChartData));
-
-      return {
-        version: 1,
-        toolVersion: '3d-surface-chart-1.0',
-        chartType: this.state.currentChartId,
-        chartData,
-      };
+      const rawProjectData = this.state.currentInstance._getProjectData?.();
+      if (!rawProjectData) return null;
+      return this.applyAnnotationStateToProjectData(this.cloneProjectData(rawProjectData));
     }
 
     async handleProjectLoad(projectData, meta = null) {
-      if (!projectData || !projectData.chartType) {
+      if (!projectData || typeof projectData !== 'object') {
+        this.showRouteError(this.lang === 'ja' ? 'プロジェクトデータ形式が不正です。' : 'Invalid project data format.');
+        return;
+      }
+
+      if (projectData.chartType !== this.config.defaultChartId || projectData.data == null) {
         this.showRouteError(this.lang === 'ja' ? 'プロジェクトデータ形式が不正です。' : 'Invalid project data format.');
         return;
       }
@@ -653,9 +550,8 @@
         if (nextMeta.name) this.state.currentProjectName = nextMeta.name;
       }
 
-      const { chartType, chartData } = projectData;
-      if (chartType !== this.state.currentChartId) {
-        await this.selectChart(chartType, { updateUrl: false });
+      if (!this.state.currentInstance || this.state.currentChartId !== this.config.defaultChartId) {
+        await this.selectChart(this.config.defaultChartId, { updateUrl: false });
       }
 
       this.syncProjectMetaToInstance();
@@ -663,8 +559,8 @@
         this.state.currentInstance.__dvzProjectLoadStarted = true;
         this.state.currentInstance._hasLoadedProject = true;
       }
-      this.state.currentInstance?._loadProjectData?.(chartData);
-      this.restoreAnnotationStateFromChartData(chartData, projectData);
+      this.state.currentInstance?._loadProjectData?.(projectData);
+      this.restoreAnnotationStateFromProjectData(projectData);
       this.updateProjectSnapshot(projectData);
     }
 
@@ -682,7 +578,7 @@
 
       return {
         shareId,
-        shareUrl: this.shareService.buildPublicSharePageUrl(shareId),
+        shareUrl: this.shareService.buildOgShareUrl(shareId),
         iframeCode: this.shareService.buildIframeEmbedCode(shareId, title),
       };
     }
@@ -785,10 +681,6 @@
     }
 
     async init() {
-      this.renderSelector();
-
-      document.getElementById('chart-back-btn')?.addEventListener('click', () => this.showSelector());
-
       window.addEventListener('popstate', () => {
         const route = window.DVZBuilderRouting.parseIndexRoute(location.search);
         this.applyRoute(route, { updateUrl: false }).catch((err) => {
