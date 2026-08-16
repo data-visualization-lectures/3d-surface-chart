@@ -24,22 +24,6 @@ begin
   end if;
 end $$;
 
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_policies
-    where schemaname = 'public'
-      and tablename = 'surface_3d_shares'
-      and policyname = 'surface_3d_shares_insert'
-  ) then
-    create policy surface_3d_shares_insert
-      on public.surface_3d_shares
-      for insert
-      with check (true);
-  end if;
-end $$;
-
 insert into storage.buckets (id, name, public)
 values ('surface-3d-og-images', 'surface-3d-og-images', true)
 on conflict (id) do update set public = excluded.public;
