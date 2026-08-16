@@ -2115,6 +2115,59 @@ class SurfaceChartApp extends DvzApp {
       });
   }
 
+  async _handleSampleSelectDetail(detail) {
+    try {
+      const mofPeriodKey = detail?.extra?.mofPeriod;
+      if (mofPeriodKey && MOF_PERIODS[mofPeriodKey]) {
+        const period = MOF_PERIODS[mofPeriodKey];
+        await fetchMOFData();
+        currentDataName = detail.name || '';
+        updateDataNameDisplay();
+        const data = getMOFFilteredData(period.start, period.end);
+        loadData(data);
+        this._updateDataMeta({
+          source: 'sample',
+          name: currentDataName,
+          rowCount: data.rowLabels.length,
+          columns: data.columnLabels,
+        });
+        const annotation = await this._resolveSampleAnnotation?.(detail, currentDataName, detail.url);
+        this._applySampleAnnotation(annotation);
+        return;
+      }
+
+      const url = detail?.url;
+      if (!url) return;
+      if (typeof dvzShowProcessingToast === 'function') {
+        dvzShowProcessingToast(t('processingSample'));
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Sample fetch failed (${res.status})`);
+      const text = await res.text();
+      const data = parseCSV(text, {
+        name: detail.name,
+        url: detail.url,
+        sourceName: detail.name || detail.url,
+      });
+      currentDataName = detail.name || '';
+      updateDataNameDisplay();
+      loadData(data);
+      this._updateDataMeta({
+        source: 'sample',
+        name: currentDataName,
+        rowCount: data.rowLabels.length,
+        columns: data.columnLabels,
+      });
+      const annotation = await this._resolveSampleAnnotation?.(detail, currentDataName, detail.url);
+      this._applySampleAnnotation(annotation);
+    } catch (err) {
+      console.error('Sample data load failed:', err);
+      if (typeof dvzShowToast === 'function') {
+        dvzShowToast(err.message || String(err), 'error');
+      }
+    }
+  }
+
   async _onSampleDataLoaded(url, format, name, options = {}) {
     if (options.background && this._shouldSkipAutoSampleLoad()) return;
     try {

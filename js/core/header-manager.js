@@ -31,6 +31,7 @@
       this.lang = getLang();
       this.header = null;
       this._buildSavePayload = null;
+      this._sampleConfiguredInstance = null;
       this.status = options.enabled === false ? 'disabled' : 'idle';
       this.lastControlsMode = 'chart';
       this.setupPromise = null;
@@ -132,6 +133,34 @@
 
     _shareLabel() {
       return this.lang === 'ja' ? 'シェア' : 'Share';
+    }
+
+    applySampleConfig(instance = this.options.getCurrentInstance?.()) {
+      const header = this.header;
+      if (!header || typeof header.setSampleConfig !== 'function') return;
+      if (!instance || this._sampleConfiguredInstance === instance) return;
+
+      const config = instance.config || {};
+      header.setSampleConfig({
+        toolId: config.sampleToolId || this.options.appName || '3d-surface-chart',
+        chartKey: config.chartKey || null,
+        onSampleSelect: async (detail) => {
+          const currentInstance = this.options.getCurrentInstance?.() || instance;
+          if (typeof currentInstance?._handleSampleSelectDetail === 'function') {
+            await currentInstance._handleSampleSelectDetail(detail);
+            return;
+          }
+          const { url, format, name } = detail || {};
+          if (!url) return;
+          if (typeof currentInstance?._safeLoadSampleData === 'function') {
+            await currentInstance._safeLoadSampleData(url, format, name, { sampleDetail: detail });
+          } else if (typeof currentInstance?._onSampleDataLoaded === 'function') {
+            await Promise.resolve(currentInstance._onSampleDataLoaded(url, format, name, { sampleDetail: detail }));
+          }
+        },
+      });
+
+      this._sampleConfiguredInstance = instance;
     }
 
     _noDataMessage() {
@@ -291,6 +320,7 @@
           },
         ],
       });
+      this.applySampleConfig();
     }
 
     async whenReady() {

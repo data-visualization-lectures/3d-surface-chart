@@ -514,6 +514,7 @@
       this.state.currentModule = mod;
       this.state.currentInstance = instance;
       this.syncProjectMetaToInstance();
+      this.headerManager.applySampleConfig(instance);
 
       await adapter.start(instance);
       if (!isCurrentRequest() && this.state.currentInstance === instance) {
