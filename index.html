@@ -63,6 +63,7 @@
   </script>
   <noscript><link rel="stylesheet" href="css/dvz-common.css"></noscript>
   <link rel="stylesheet" href="https://id.data-viz-lectures.com/lib/dvz-setting-sidebar.v1.css">
+  <link rel="stylesheet" href="css/dvz-common.css?v=20260816-visual-contract">
   <link rel="stylesheet" href="css/style.css?v=20260807-setting-sidebar">
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased">
@@ -127,7 +128,7 @@
       <div data-dvz-setting-panels class="dvz-setting-sidebar__panels flex flex-1 flex-col overflow-hidden">
 
         <!-- Data tab (content injected by module) -->
-        <div id="tab-data" data-dvz-setting-panel class="dvz-setting-sidebar__panel sidebar-panel flex flex-1 flex-col overflow-hidden">
+        <div id="tab-data" data-dvz-setting-panel class="dvz-setting-sidebar__panel sidebar-panel common-data-tab flex flex-1 flex-col overflow-hidden">
           <div class="flex-1 overflow-y-auto">
             <!-- Module-specific data panel content injected here -->
           </div>
@@ -171,33 +172,29 @@
         </div>
 
         <!-- Export tab (shared across all charts) -->
-        <div id="tab-export" data-dvz-setting-panel class="dvz-setting-sidebar__panel sidebar-panel hidden flex-1 overflow-y-auto">
-          <section class="px-5 py-4">
-            <h3 class="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="exportImage">Image</h3>
-            <div class="flex flex-col gap-3">
-              <button id="export-svg-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                SVG
-              </button>
-              <button id="export-png-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                PNG (2x)
-              </button>
-            </div>
-          </section>
-          <section class="border-t border-gray-100 px-5 py-4">
-            <h3 class="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-400" data-i18n="exportData">Data</h3>
-            <div class="flex flex-col gap-3">
-              <button id="export-csv-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                CSV
-              </button>
-              <button id="export-json-btn" class="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                JSON
-              </button>
-            </div>
-          </section>
+        <div id="tab-export" data-dvz-setting-panel class="dvz-setting-sidebar__panel sidebar-panel common-export-tab hidden flex-1 overflow-y-auto">
+          <div class="panel-section common-tab-section export-actions">
+            <h3 class="common-panel-heading" data-i18n="exportImage">Image</h3>
+            <button id="export-svg-btn" type="button" class="dvz-btn common-export-button">
+              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
+              SVG
+            </button>
+            <button id="export-png-btn" type="button" class="dvz-btn common-export-button">
+              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
+              PNG (2x)
+            </button>
+          </div>
+          <div class="panel-section common-tab-section export-actions">
+            <h3 class="common-panel-heading" data-i18n="exportData">Data</h3>
+            <button id="export-csv-btn" type="button" class="dvz-btn common-export-button">
+              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
+              CSV
+            </button>
+            <button id="export-json-btn" type="button" class="dvz-btn common-export-button">
+              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
+              JSON
+            </button>
+          </div>
         </div>
 
       </div>

@@ -1645,26 +1645,25 @@ class DvzApp {
   _buildDataSourceSection() {
     const section = document.createElement('section');
     section.id = 'dvz-data-source';
-    section.className = 'border-b border-gray-100 px-5 py-4';
+    section.className = 'panel-section common-tab-section';
 
     const heading = document.createElement('h3');
-    heading.className = 'mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-400';
+    heading.className = 'common-panel-heading';
     heading.textContent = t('upload');
     section.appendChild(heading);
 
-    // Upload dropzone
     const dropzone = document.createElement('div');
     dropzone.id = 'dvz-dropzone';
-    dropzone.className = 'flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400 transition hover:border-gray-400 hover:text-gray-500';
-    dropzone.innerHTML = `<svg class="mb-2 h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg><span>${t('dropHere')}</span><span class="mt-1 text-xs">${t('orClick')}</span>`;
+    dropzone.className = 'dropzone';
+    dropzone.innerHTML = `
+      <input id="dvz-file-input" type="file" accept=".csv,.tsv,.txt,.json" aria-label="${t('upload')}">
+      <svg class="dropzone-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 8.25 12 3.75m0 0L7.5 8.25M12 3.75V15"></path>
+      </svg>
+      <span class="dropzone-primary">${t('dropHere')}</span>
+      <span class="dropzone-secondary">${t('orClick')}</span>
+    `.trim();
     section.appendChild(dropzone);
-
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.id = 'dvz-file-input';
-    fileInput.accept = '.csv,.tsv,.txt,.json';
-    fileInput.className = 'hidden';
-    section.appendChild(fileInput);
 
     return section;
   }
@@ -1672,17 +1671,17 @@ class DvzApp {
   _buildDataMetaSection() {
     const section = document.createElement('section');
     section.id = 'dvz-data-meta';
-    section.className = 'border-b border-gray-100 px-5 py-4';
+    section.className = 'panel-section common-tab-section';
 
     const heading = document.createElement('h3');
-    heading.className = 'mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400';
+    heading.className = 'common-panel-heading';
     heading.textContent = t('loadedData');
     section.appendChild(heading);
 
     const content = document.createElement('div');
     content.id = 'dvz-meta-content';
-    content.className = 'text-sm text-gray-500';
-    content.innerHTML = `<span class="text-gray-400">${t('noDataLoaded')}</span>`;
+    content.className = 'summary-list';
+    content.innerHTML = `<p class="data-meta-summary">${t('noDataLoaded')}</p>`;
     section.appendChild(content);
 
     return section;
@@ -1691,18 +1690,18 @@ class DvzApp {
   _buildDataPreviewSection() {
     const section = document.createElement('section');
     section.id = 'dvz-data-preview';
-    section.className = 'border-b border-gray-100 px-5 py-4';
+    section.className = 'panel-section common-tab-section';
 
     const heading = document.createElement('h3');
     heading.id = 'dvz-data-preview-heading';
-    heading.className = 'mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400';
+    heading.className = 'common-panel-heading';
     heading.textContent = t('dataPreviewTitle');
     section.appendChild(heading);
 
     const content = document.createElement('div');
     content.id = 'dvz-data-preview-content';
-    content.className = 'text-sm text-gray-500';
-    content.innerHTML = `<span class="text-gray-400">${t('dataPreviewEmpty')}</span>`;
+    content.className = 'data-preview';
+    content.innerHTML = `<p class="data-meta-summary">${t('dataPreviewEmpty')}</p>`;
     section.appendChild(content);
 
     return section;
@@ -1726,43 +1725,31 @@ class DvzApp {
     const container = document.getElementById('dvz-meta-content');
     if (!container) return;
 
-    const badgeColor = info.source === 'sample'
-      ? 'bg-blue-100 text-blue-700'
-      : 'bg-green-100 text-green-700';
+    const sourceType = info.source === 'sample' ? 'sample' : 'upload';
     const badgeText = info.source === 'sample' ? t('dataSourceSample') : t('dataSourceUpload');
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
+    const safeName = escapeHtml(info.name);
+    const safeColumns = (info.columns || []).map((col) => escapeHtml(col)).join(', ');
 
-    const colsPreview = (info.columns || []).slice(0, 5).join(', ');
-    const colsMore = (info.columns || []).length > 5 ? ` +${info.columns.length - 5}` : '';
+    const rowSummary = info.rowCount != null
+      ? `${Number(info.rowCount).toLocaleString()} ${t('metaRows')}`
+      : '';
+    const colSummary = info.columns ? ` / ${info.columns.length} ${t('metaCols')}` : '';
 
-    const header = document.createElement('div');
-    header.className = 'flex items-center gap-2 mb-1';
-
-    const badge = document.createElement('span');
-    badge.className = `inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${badgeColor}`;
-    badge.textContent = badgeText;
-    header.appendChild(badge);
-
-    const name = document.createElement('span');
-    name.className = 'truncate font-medium text-gray-700';
-    name.textContent = info.name || '';
-    header.appendChild(name);
-
-    const summary = document.createElement('div');
-    summary.className = 'text-xs text-gray-400';
-    summary.textContent =
-      `${info.rowCount != null ? `${Number(info.rowCount).toLocaleString()} ${t('metaRows')}` : ''}` +
-      `${info.columns ? ` / ${info.columns.length} ${t('metaCols')}` : ''}`;
-
-    const nodes = [header, summary];
-    if (info.columns) {
-      const columns = document.createElement('div');
-      columns.className = 'mt-1 text-xs text-gray-400 truncate';
-      columns.title = (info.columns || []).join(', ');
-      columns.textContent = `${t('metaColumns')}: ${colsPreview}${colsMore}`;
-      nodes.push(columns);
-    }
-
-    container.replaceChildren(...nodes);
+    container.innerHTML = `
+      <div class="data-source-line">
+        <span class="data-source-badge" data-source-type="${sourceType}">${badgeText}</span>
+        <span class="data-source-name">${safeName}</span>
+      </div>
+      ${rowSummary || colSummary ? `<p class="data-meta-summary">${rowSummary}${colSummary}</p>` : ''}
+      ${info.columns ? `<p class="data-meta-columns" title="${safeColumns}">${t('metaColumns')}: ${safeColumns}</p>` : ''}
+    `.trim();
 
     this._updateDataPreview(info);
   }
@@ -1802,23 +1789,17 @@ class DvzApp {
 
     if (!rows.length || !columns.length) {
       const empty = document.createElement('p');
-      empty.className = 'text-xs text-gray-400';
+      empty.className = 'data-meta-summary';
       empty.textContent = t('dataPreviewEmpty');
       content.appendChild(empty);
       return;
     }
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'overflow-x-auto rounded border border-gray-200';
-
     const table = document.createElement('table');
-    table.className = 'min-w-max w-full border-collapse text-xs text-gray-600';
-
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
     columns.forEach((col) => {
       const th = document.createElement('th');
-      th.className = 'bg-gray-50 px-2 py-1 text-left font-semibold text-gray-500 border-b border-gray-200 border-r border-gray-100';
       th.textContent = String(col);
       headRow.appendChild(th);
     });
@@ -1830,7 +1811,6 @@ class DvzApp {
       const tr = document.createElement('tr');
       columns.forEach((col, idx) => {
         const td = document.createElement('td');
-        td.className = 'px-2 py-1 border-b border-gray-100 border-r border-gray-100';
         let rawValue = '';
         if (Array.isArray(row)) rawValue = row[idx];
         else if (row && typeof row === 'object') rawValue = row[col];
@@ -1841,8 +1821,7 @@ class DvzApp {
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    wrapper.appendChild(table);
-    content.appendChild(wrapper);
+    content.appendChild(table);
   }
 
   _wireDataPanelEvents() {
@@ -1852,8 +1831,8 @@ class DvzApp {
 
   // ----------------------------------------------------------
   // Share
-  // Flow: Annotateタブのタイトル取得 → Supabase保存 → URL生成 → モーダル表示
-  // Uses config.shareTable for the Supabase table name.
+  // Flow: 保存済みプロジェクト → publish-surface-3d-share → share.html?id=
+  // config.shareTable は share.html の読み取りテーブル名。クライアント INSERT には使わない。
   // Subclass can override _getShareUrl(shareId) for tool-specific public routes.
   // ----------------------------------------------------------
   async shareProject() {

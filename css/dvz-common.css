@@ -289,9 +289,240 @@ dataviz-tool-header {
   opacity: 0.5;
 }
 
-/* Dropzone */
-#dvz-dropzone.dragover {
-  border-color: #6a6; background: #f0faf0; color: #363;
+/* Dropzone + common Data/Export tab visual contract */
+.panel-section {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px;
+}
+
+.panel-section:last-child {
+  border-bottom: 0;
+}
+
+.dvz-btn {
+  display: inline-flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #cfd6df;
+  border-radius: 7px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 10px;
+  padding: 8px 12px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.dvz-btn:first-child {
+  margin-top: 0;
+}
+
+.dvz-btn:hover {
+  background: #f8fafc;
+  border-color: #aeb8c5;
+}
+
+.dropzone {
+  position: relative;
+  display: flex;
+  min-height: 116px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #9ca3af;
+  overflow: hidden;
+  text-align: center;
+}
+
+.dropzone-icon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 10px;
+  color: #9ca3af;
+}
+
+.dropzone-primary {
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.dropzone-secondary {
+  margin-top: 4px;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone.dragover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.summary-list {
+  min-width: 0;
+}
+
+.data-source-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.data-source-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.data-source-badge[data-source-type="upload"],
+.data-source-badge[data-source-type="project"] {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.data-source-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-meta-summary,
+.data-meta-columns {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.data-meta-summary {
+  margin-top: 8px;
+}
+
+.data-meta-columns {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-preview {
+  max-height: 210px;
+  margin-top: 0;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.data-preview table {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.data-preview th,
+.data-preview td {
+  max-width: 180px;
+  overflow: hidden;
+  border-right: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3f4f6;
+  padding: 4px 8px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-preview th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.common-panel-heading {
+  margin: 0 0 12px;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16.5px;
+  letter-spacing: 0.025em;
+}
+
+.common-tab-section {
+  padding: 16px 20px;
+}
+
+.export-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.export-actions .common-panel-heading {
+  margin-bottom: 0;
+}
+
+.common-export-button.dvz-btn {
+  min-height: 40px;
+  margin-top: 0;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  box-shadow: inset 0 0 0 1px #d1d5db, 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.common-export-button.dvz-btn:hover {
+  border: 0;
+  background: #f9fafb;
+}
+
+.common-export-button svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
 }
 
 /* Embed mode */

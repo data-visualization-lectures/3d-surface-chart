@@ -98,6 +98,26 @@ test('editor stacks the WebGL chart and sidebar below the shared two-pane breakp
   assert.match(moduleSource, /resizeObserver\s*=\s*new ResizeObserver\(\(\)\s*=>\s*onResize\(\)\)/);
 });
 
+test('data and export tabs follow the common visual contract', () => {
+  const html = read('index.html');
+  const css = read('css/dvz-common.css');
+  const common = read('js/dvz-common.js');
+
+  assert.match(html, /id="tab-data"[^>]*common-data-tab/);
+  assert.match(html, /id="tab-export"[^>]*common-export-tab/);
+  assert.match(html, /class="common-panel-heading" data-i18n="exportImage"/);
+  assert.match(html, /class="common-panel-heading" data-i18n="exportData"/);
+  assert.equal((html.match(/class="dvz-btn common-export-button"/g) || []).length, 4);
+  assert.equal((html.match(/<svg aria-hidden="true" fill="none" viewBox="0 0 24 24"/g) || []).length, 4);
+  assert.match(css, /\.common-panel-heading\s*\{[^}]*color:\s*#9ca3af;[^}]*font-size:\s*11px;[^}]*font-weight:\s*700;[^}]*line-height:\s*16\.5px;/s);
+  assert.match(css, /\.common-export-button\.dvz-btn\s*\{[^}]*min-height:\s*40px;[^}]*color:\s*#374151;[^}]*font-size:\s*14px;[^}]*font-weight:\s*600;/s);
+  assert.match(css, /\.common-export-button svg\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;[^}]*color:\s*#9ca3af;/s);
+  assert.match(common, /className = 'panel-section common-tab-section'/);
+  assert.match(common, /className = 'common-panel-heading'/);
+  assert.match(common, /className = 'dropzone'/);
+  assert.match(common, /class="data-source-badge"/);
+});
+
 test('3D settings persistence and share/embed contracts remain intact', () => {
   const moduleSource = read('js/modules/3d-surface-chart.js');
   const runtime = read('js/core/runtime.js');
