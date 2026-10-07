@@ -935,17 +935,18 @@ class DvzApp {
     }
 
     const sourcePrefix = `${t('annotateSource')}: `;
-    if (source && normalizedUrl) {
+    const sourceBody = source.replace(/^(?:出典[:：]|Source:)\s*/i, '');
+    if (sourceBody && normalizedUrl) {
       sourceEl.append(sourcePrefix);
       const link = document.createElement('a');
       link.href = normalizedUrl;
       link.target = '_blank';
       link.rel = 'noopener';
-      link.className = 'underline hover:text-gray-600';
-      link.textContent = source;
+      link.className = '';
+      link.textContent = sourceBody;
       sourceEl.appendChild(link);
-    } else if (source) {
-      sourceEl.textContent = `${sourcePrefix}${source}`;
+    } else if (sourceBody) {
+      sourceEl.textContent = `${sourcePrefix}${sourceBody}`;
     }
   }
 

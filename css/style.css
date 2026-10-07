@@ -349,4 +349,7 @@ circle.dot { transition: opacity 0.15s ease; }
 .dvz-template-webgl #legend .legend-label { min-width: 30px; }
 .dvz-template-webgl #data-info { font-size: 0.75rem; color: #999; margin-top: 8px; }
 
+#chart-source a { color: #9ca3af; text-decoration: underline; text-underline-offset: 2px; }
+#chart-source a:hover { text-decoration: none; }
+
 /* ── Embed mode ─────────────────────────────────────────── */

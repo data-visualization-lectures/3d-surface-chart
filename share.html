@@ -121,6 +121,8 @@ circle.dot { transition: opacity 0.15s ease; }
 #legend { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.8rem; color: #666; }
 #legend canvas { border-radius: 3px; border: 1px solid #ddd; }
 #dvz-content #chart-source, #dvz-content #chart-source a { color: #9ca3af; }
+#dvz-content #chart-source a { text-decoration: underline; text-underline-offset: 2px; }
+#dvz-content #chart-source a:hover { text-decoration: none; }
 </style>
 </head>
 <body class="dvz-share-shell--document">
@@ -151,7 +153,7 @@ circle.dot { transition: opacity 0.15s ease; }
 <div id="bump-tooltip" class="bump-tooltip"></div>
 
 <!-- dvz-common.js + chart-registry.js (chart module loader reuses these) -->
-<script src="js/dvz-common.js"></script>
+<script src="js/dvz-common.js?v=20260924a"></script>
 <script src="https://app.dataviz.jp/lib/settings-compat.js"></script>
 <script src="js/chart-registry.js"></script>
 <script src="js/core/routing.js"></script>
