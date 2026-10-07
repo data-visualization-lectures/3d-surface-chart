@@ -749,8 +749,9 @@ class DvzApp {
   // Annotate
   // ----------------------------------------------------------
   _setupAnnotate() {
-    document.getElementById('annotate-apply-btn').addEventListener('click', () => {
-      this._applyAnnotation();
+    const apply = () => this._applyAnnotation();
+    ['annotate-title', 'annotate-source', 'annotate-source-url'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', apply);
     });
   }
 
