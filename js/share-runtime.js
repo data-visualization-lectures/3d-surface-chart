@@ -130,7 +130,7 @@
     link.href = sourceUrl;
     link.target = '_blank';
     link.rel = 'noopener';
-    link.style.color = '#888';
+    link.style.color = '#9ca3af';
     link.style.textDecoration = 'underline';
     link.textContent = source;
     sourceEl.appendChild(link);
